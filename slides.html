@@ -4,44 +4,48 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>AIMy — In-Store AI Shopping Assistant</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,400&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet" />
   <style>
-    /* ─── Reset & Base ─────────────────────────────────────────── */
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
+    /* ═══ Design tokens ═══════════════════════════════════════════ */
     :root {
-      --bg:        #050810;
-      --surface:   #0d1220;
-      --card:      #111827;
-      --border:    rgba(99,179,237,0.18);
-      --accent1:   #63b3ed;   /* sky blue  */
-      --accent2:   #9f7aea;   /* violet    */
-      --accent3:   #48bb78;   /* emerald   */
-      --accent4:   #f6ad55;   /* amber     */
-      --text:      #e2e8f0;
-      --muted:     #718096;
-      --white:     #ffffff;
-      --grad-hero: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-      --grad-blue: linear-gradient(135deg, #1e3a5f, #0d1220);
-      --grad-violet: linear-gradient(135deg, #2d1b69, #0d1220);
-      --grad-green: linear-gradient(135deg, #1a3a2a, #0d1220);
+      --bg:           #0d0c0b;
+      --surface:      #141210;
+      --surface-elevated: #1c1917;
+      --border:       rgba(255,255,255,0.08);
+      --border-focus: rgba(255,255,255,0.12);
+      --primary:      #b45309;
+      --primary-soft: rgba(180,83,9,0.15);
+      --text:         #fafaf9;
+      --text-muted:   #b8b3ae;
+      --text-dim:     #8a8580;
+      --success:      #15803d;
+      --radius-sm:   4px;
+      --radius-md:   8px;
+      --radius-lg:   8px;
+      --space-xs:    8px;
+      --space-sm:    16px;
+      --space-md:    24px;
+      --space-lg:    32px;
+      --space-xl:    48px;
+      --space-2xl:   64px;
+      --ease:        cubic-bezier(0.4, 0, 0.2, 1);
     }
 
+    /* ═══ Reset & base ═══════════════════════════════════════════ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body {
       width: 100%; height: 100%;
       background: var(--bg);
-      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      font-family: 'Source Sans 3', system-ui, sans-serif;
       color: var(--text);
       overflow: hidden;
+      -webkit-font-smoothing: antialiased;
     }
 
-    /* ─── Deck container ────────────────────────────────────────── */
-    .deck {
-      width: 100vw; height: 100vh;
-      position: relative;
-      overflow: hidden;
-    }
-
-    /* ─── Slides ───────────────────────────────────────────────── */
+    /* ═══ Layout ═════════════════════════════════════════════════ */
+    .deck { width: 100vw; height: 100vh; position: relative; overflow: hidden; }
     .slide {
       position: absolute;
       inset: 0;
@@ -49,489 +53,378 @@
       flex-direction: column;
       justify-content: center;
       align-items: center;
-      padding: 60px 80px;
+      padding: var(--space-2xl) 5vw;
       opacity: 0;
-      transform: translateX(60px);
-      transition: opacity 0.55s cubic-bezier(.4,0,.2,1),
-                  transform 0.55s cubic-bezier(.4,0,.2,1);
+      transform: translateX(20px);
+      transition: opacity 0.35s var(--ease), transform 0.35s var(--ease);
       pointer-events: none;
+      background: var(--bg);
     }
-    .slide.active {
-      opacity: 1;
-      transform: translateX(0);
-      pointer-events: all;
-    }
-    .slide.exit {
-      opacity: 0;
-      transform: translateX(-60px);
-    }
+    .slide.active { opacity: 1; transform: translateX(0); pointer-events: all; }
+    .slide.exit { opacity: 0; transform: translateX(-20px); }
+    .slide--hero { background: linear-gradient(165deg, #11100e 0%, var(--bg) 45%, #0f0e0c 100%); }
+    .content { position: relative; z-index: 1; width: 100%; max-width: 1000px; }
+    .content--center { text-align: center; }
+    .content--narrow { max-width: 720px; }
+    .content--tight { max-width: 560px; }
+    .slide--hero .content { padding-top: 0; }
 
-    /* ─── Background variants ──────────────────────────────────── */
-    .slide-hero    { background: var(--grad-hero); }
-    .slide-dark    { background: var(--bg); }
-    .slide-blue    { background: var(--grad-blue); }
-    .slide-violet  { background: var(--grad-violet); }
-    .slide-green   { background: var(--grad-green); }
-
-    /* ─── Animated mesh background ────────────────────────────── */
-    .mesh {
-      position: absolute; inset: 0;
-      overflow: hidden;
-      pointer-events: none;
-      z-index: 0;
-    }
-    .mesh::before, .mesh::after {
-      content: '';
-      position: absolute;
-      border-radius: 50%;
-      filter: blur(80px);
-      opacity: 0.15;
-      animation: drift 12s ease-in-out infinite alternate;
-    }
-    .mesh::before {
-      width: 600px; height: 600px;
-      background: radial-gradient(circle, var(--accent1), transparent 70%);
-      top: -200px; left: -200px;
-    }
-    .mesh::after {
-      width: 500px; height: 500px;
-      background: radial-gradient(circle, var(--accent2), transparent 70%);
-      bottom: -150px; right: -150px;
-      animation-delay: -6s;
-    }
-    @keyframes drift {
-      from { transform: translate(0,0) scale(1); }
-      to   { transform: translate(60px,40px) scale(1.1); }
-    }
-
-    .content { position: relative; z-index: 1; width: 100%; max-width: 1100px; }
-
-    /* ─── Typography ───────────────────────────────────────────── */
+    /* ═══ Typography ════════════════════════════════════════════ */
     .eyebrow {
-      font-size: 0.78rem;
-      font-weight: 700;
-      letter-spacing: 0.25em;
-      text-transform: uppercase;
-      color: var(--accent1);
-      margin-bottom: 20px;
-    }
-    h1 {
-      font-size: clamp(3rem, 6vw, 5.5rem);
-      font-weight: 800;
-      line-height: 1.05;
-      letter-spacing: -0.02em;
-    }
-    h2 {
-      font-size: clamp(2rem, 4vw, 3.2rem);
-      font-weight: 700;
-      line-height: 1.15;
-      letter-spacing: -0.015em;
-      margin-bottom: 12px;
-    }
-    h3 {
-      font-size: 1.2rem;
+      display: inline-block;
+      padding: var(--space-xs) var(--space-sm);
+      border-radius: var(--radius-sm);
+      background: var(--primary-soft);
+      border: 1px solid var(--border);
+      font-size: 0.75rem;
       font-weight: 600;
-      color: var(--accent1);
-      margin-bottom: 8px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--primary);
+      margin-bottom: var(--space-md);
     }
+    h1, h2, h3 {
+      font-family: 'Fraunces', Georgia, serif;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1.2;
+    }
+    h1 { font-size: clamp(2.25rem, 5vw, 4rem); letter-spacing: -0.02em; }
+    h2 { font-size: clamp(1.6rem, 3.5vw, 2.5rem); letter-spacing: -0.02em; margin-bottom: var(--space-sm); line-height: 1.25; }
+    h3 { font-size: 1.0625rem; font-weight: 600; font-family: 'Source Sans 3', system-ui, sans-serif; color: var(--primary); margin-bottom: 6px; }
     .subtitle {
-      font-size: clamp(1.1rem, 2vw, 1.5rem);
-      color: var(--muted);
-      font-weight: 400;
-      margin-top: 16px;
+      font-size: clamp(1rem, 1.8vw, 1.25rem);
+      color: var(--text);
       line-height: 1.6;
+      margin-top: var(--space-sm);
+      letter-spacing: 0.01em;
     }
-    p {
-      font-size: 1.05rem;
-      line-height: 1.75;
-      color: #a0aec0;
-    }
+    p { font-size: 1rem; line-height: 1.7; color: var(--text); max-width: 38em; }
+    .grad-text { color: var(--primary); font-weight: 700; }
+    .grad-text-green { color: var(--success); font-weight: 700; }
 
-    /* ─── Gradient text ────────────────────────────────────────── */
-    .grad-text {
-      background: linear-gradient(90deg, var(--accent1) 0%, var(--accent2) 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-    .grad-text-green {
-      background: linear-gradient(90deg, var(--accent3) 0%, var(--accent1) 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-
-    /* ─── Badge / chip ─────────────────────────────────────────── */
+    /* ═══ Chips ══════════════════════════════════════════════════ */
+    .chip-row { display: flex; flex-wrap: wrap; gap: var(--space-xs); margin-top: var(--space-md); }
     .chip {
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      padding: 5px 14px;
-      border-radius: 999px;
+      padding: 6px var(--space-sm);
+      border-radius: var(--radius-sm);
       border: 1px solid var(--border);
-      font-size: 0.82rem;
-      font-weight: 600;
-      color: var(--accent1);
-      background: rgba(99,179,237,0.07);
-      letter-spacing: 0.04em;
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--primary);
+      background: var(--surface);
+      transition: border-color 0.2s, background 0.2s;
     }
-    .chip.violet {
-      color: var(--accent2);
-      background: rgba(159,122,234,0.07);
-      border-color: rgba(159,122,234,0.25);
-    }
-    .chip.green {
-      color: var(--accent3);
-      background: rgba(72,187,120,0.07);
-      border-color: rgba(72,187,120,0.25);
-    }
-    .chip.amber {
-      color: var(--accent4);
-      background: rgba(246,173,85,0.07);
-      border-color: rgba(246,173,85,0.25);
-    }
-    .chip-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 30px; }
+    .chip:hover { border-color: var(--border-focus); background: var(--surface-elevated); }
+    .chip--violet,
+    .chip--green,
+    .chip--amber { color: var(--text-muted); }
 
-    /* ─── Cards ────────────────────────────────────────────────── */
-    .cards {
-      display: grid;
-      gap: 20px;
-      margin-top: 36px;
-    }
+    /* ═══ Cards ══════════════════════════════════════════════════ */
+    .cards { display: grid; gap: var(--space-sm); margin-top: var(--space-md); }
     .cards-2 { grid-template-columns: 1fr 1fr; }
-    .cards-3 { grid-template-columns: 1fr 1fr 1fr; }
+    .cards-3 { grid-template-columns: repeat(3, 1fr); }
     .card {
-      background: var(--card);
+      background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 28px 30px;
-      transition: border-color 0.3s, transform 0.3s;
+      border-radius: var(--radius-sm);
+      padding: var(--space-md) var(--space-lg);
+      transition: border-color 0.2s;
     }
-    .card:hover {
-      border-color: rgba(99,179,237,0.45);
-      transform: translateY(-3px);
+    .card:hover { border-color: var(--border-focus); }
+    .card-icon { font-size: 1.5rem; margin-bottom: var(--space-sm); opacity: 0.9; }
+    .card-img {
+      width: 100%;
+      height: 100px;
+      object-fit: cover;
+      border-radius: var(--radius-sm);
+      margin-bottom: var(--space-sm);
+      background: var(--surface-elevated);
     }
-    .card-icon {
-      font-size: 2rem;
-      margin-bottom: 14px;
-    }
-    .card p { font-size: 0.95rem; }
+    .card p { font-size: 1rem; line-height: 1.65; max-width: none; }
+    .card--accent { border-left: 3px solid var(--primary); }
+    .card--secondary,
+    .card--success { border-left: none; }
 
-    /* ─── Pipeline diagram ─────────────────────────────────────── */
+    /* ═══ Pipeline ═════════════════════════════════════════════════ */
     .pipeline {
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       gap: 0;
-      margin-top: 40px;
+      margin-top: var(--space-lg);
       width: 100%;
       justify-content: center;
+      position: relative;
+    }
+    .pipeline::before {
+      content: '';
+      position: absolute;
+      top: 32px;
+      left: 6%;
+      right: 6%;
+      height: 1px;
+      background: var(--border);
+      z-index: 0;
     }
     .pipe-step {
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 10px;
+      gap: var(--space-xs);
       flex: 1;
+      position: relative;
+      z-index: 1;
     }
     .pipe-box {
       width: 100%;
-      max-width: 150px;
-      padding: 16px 10px;
-      background: var(--card);
+      max-width: 130px;
+      padding: var(--space-sm) var(--space-xs);
+      background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 12px;
+      border-radius: 0;
       text-align: center;
-      font-size: 0.82rem;
+      font-size: 0.75rem;
       font-weight: 600;
       color: var(--text);
+      transition: border-color 0.2s;
+    }
+    .pipe-box:hover { border-color: var(--border-focus); }
+    .pipe-box .pipe-icon { font-size: 1.35rem; display: block; margin-bottom: 4px; opacity: 0.9; }
+    .pipe-arrow { font-size: 1rem; color: var(--text-dim); flex-shrink: 0; padding: 0 2px; z-index: 1; }
+    .pipe-label { font-size: 0.625rem; color: var(--text-dim); text-align: center; max-width: 100px; line-height: 1.35; }
+    .pipe-box--primary { border-left: 3px solid var(--primary); background: var(--surface-elevated); }
+    .pipe-box--secondary,
+    .pipe-box--success,
+    .pipe-box--warning { border-left: 3px solid var(--primary); background: var(--surface-elevated); }
+
+    /* ═══ Stats ════════════════════════════════════════════════════ */
+    .stats { display: flex; gap: var(--space-sm); margin-top: var(--space-md); }
+    .stat {
+      flex: 1;
+      text-align: center;
+      padding: var(--space-md) var(--space-sm);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 0;
+      border-left: 3px solid var(--primary);
+    }
+    .stat:nth-child(2),
+    .stat:nth-child(3),
+    .stat:nth-child(4) { border-left-color: var(--border-focus); }
+    .stats--feature { flex-wrap: wrap; gap: var(--space-md); align-items: baseline; }
+    .stat--main { flex: 0 0 auto; min-width: 120px; }
+    .stats-inline { font-size: 0.9375rem; color: var(--text-muted); margin: 0; flex: 1; min-width: 200px; line-height: 1.5; }
+    .stat-num { font-family: 'Fraunces', Georgia, serif; font-size: clamp(1.75rem, 3vw, 2.5rem); font-weight: 700; line-height: 1; color: var(--text); }
+    .stat-label { font-size: 0.8125rem; color: var(--text-muted); margin-top: 6px; font-weight: 500; }
+
+    /* ═══ Code block ══════════════════════════════════════════════ */
+    .code-block {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 0 0 var(--radius-md) var(--radius-md);
+      border-top: none;
+      padding: 48px var(--space-md) var(--space-md);
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.8125rem;
+      line-height: 1.65;
+      color: var(--text-muted);
       position: relative;
     }
-    .pipe-box .pipe-icon { font-size: 1.6rem; display: block; margin-bottom: 6px; }
-    .pipe-arrow {
-      font-size: 1.4rem;
-      color: var(--accent1);
-      opacity: 0.6;
-      flex-shrink: 0;
-      padding: 0 4px;
-    }
-    .pipe-label {
-      font-size: 0.7rem;
-      color: var(--muted);
-      text-align: center;
-      max-width: 120px;
-    }
-    .pipe-box.highlight {
-      border-color: var(--accent2);
-      background: linear-gradient(135deg, rgba(159,122,234,0.12), var(--card));
-      box-shadow: 0 0 20px rgba(159,122,234,0.18);
-    }
-    .pipe-box.highlight2 {
-      border-color: var(--accent1);
-      background: linear-gradient(135deg, rgba(99,179,237,0.12), var(--card));
-      box-shadow: 0 0 20px rgba(99,179,237,0.18);
-    }
-
-    /* ─── Big stat ─────────────────────────────────────────────── */
-    .stats { display: flex; gap: 40px; margin-top: 40px; }
-    .stat {
-      text-align: center;
-      flex: 1;
-      padding: 30px 20px;
-      background: var(--card);
+    .code-block::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 36px;
+      background: var(--surface-elevated);
+      border-radius: var(--radius-md) var(--radius-md) 0 0;
       border: 1px solid var(--border);
-      border-radius: 16px;
+      border-bottom: none;
+      box-sizing: border-box;
     }
-    .stat-num {
-      font-size: 3rem;
-      font-weight: 800;
-      line-height: 1;
-    }
-    .stat-label {
-      font-size: 0.85rem;
-      color: var(--muted);
-      margin-top: 8px;
-      font-weight: 500;
-    }
-
-    /* ─── Code block ───────────────────────────────────────────── */
-    .code-block {
-      background: #0a0e1a;
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 24px 28px;
-      margin-top: 28px;
-      font-family: 'Cascadia Code', 'Fira Code', 'Menlo', monospace;
-      font-size: 0.88rem;
-      line-height: 1.7;
-      color: #a0aec0;
-      overflow: hidden;
-    }
-    .code-block .kw  { color: #9f7aea; }
-    .code-block .fn  { color: #63b3ed; }
-    .code-block .str { color: #48bb78; }
-    .code-block .cm  { color: #4a5568; font-style: italic; }
-    .code-block .var { color: #f6ad55; }
-
-    /* ─── List ─────────────────────────────────────────────────── */
-    .feat-list { list-style: none; margin-top: 30px; display: flex; flex-direction: column; gap: 16px; }
-    .feat-list li {
-      display: flex;
-      align-items: flex-start;
-      gap: 14px;
-      font-size: 1.05rem;
-      color: #cbd5e0;
-    }
-    .feat-list .bullet {
-      width: 8px; height: 8px;
+    .code-block::after {
+      content: '';
+      position: absolute;
+      top: 12px; left: 14px;
+      width: 10px; height: 10px;
       border-radius: 50%;
-      background: var(--accent1);
-      flex-shrink: 0;
-      margin-top: 8px;
+      background: #ef4444;
+      box-shadow: 16px 0 0 #eab308, 32px 0 0 #22c55e;
+      z-index: 1;
     }
-    .feat-list .bullet.v { background: var(--accent2); }
-    .feat-list .bullet.g { background: var(--accent3); }
-    .feat-list .bullet.a { background: var(--accent4); }
+    .code-block .kw { color: var(--primary); }
+    .code-block .fn { color: var(--text); }
+    .code-block .str { color: var(--success); }
+    .code-block .cm { color: var(--text-dim); font-style: italic; }
+    .code-block .var { color: var(--text-muted); }
 
-    /* ─── Stack grid ───────────────────────────────────────────── */
-    .stack-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 16px;
-      margin-top: 36px;
+    .steps-list {
+      margin-top: var(--space-md);
+      padding-left: 1.25rem;
+      font-size: 1rem;
+      color: var(--text);
+      line-height: 1.85;
     }
-    .stack-item {
-      background: var(--card);
+    .steps-list li { margin-bottom: 0.35rem; }
+    .steps-list strong { color: var(--text); font-weight: 600; }
+
+    .slide-video {
+      margin-top: var(--space-lg);
+      width: 100%;
+      max-width: 560px;
       border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 20px 16px;
-      text-align: center;
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+      background: var(--surface);
     }
-    .stack-item .stack-icon { font-size: 2rem; margin-bottom: 10px; }
-    .stack-item .stack-name { font-size: 0.9rem; font-weight: 700; color: var(--text); }
-    .stack-item .stack-desc { font-size: 0.75rem; color: var(--muted); margin-top: 4px; }
+    .slide-video video {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+    .slide-video-caption {
+      padding: var(--space-xs) var(--space-sm);
+      font-size: 0.8125rem;
+      color: var(--text-muted);
+      border-top: 1px solid var(--border);
+    }
 
-    /* ─── Quote / callout ──────────────────────────────────────── */
+    /* ═══ List & callout ═════════════════════════════════════════ */
+    .feat-list { list-style: none; margin-top: var(--space-md); display: flex; flex-direction: column; gap: var(--space-sm); }
+    .feat-list li { display: flex; align-items: flex-start; gap: var(--space-sm); font-size: 1rem; color: var(--text); line-height: 1.6; }
+    .feat-list .bullet { width: 5px; height: 5px; border-radius: 50%; background: var(--primary); flex-shrink: 0; margin-top: 8px; }
+    .feat-list .bullet.v,
+    .feat-list .bullet.g,
+    .feat-list .bullet.a { background: var(--text-dim); }
     .callout {
-      border-left: 3px solid var(--accent2);
-      padding: 18px 24px;
-      background: rgba(159,122,234,0.07);
-      border-radius: 0 12px 12px 0;
-      margin-top: 28px;
-      font-size: 1.05rem;
+      margin-top: var(--space-md);
+      padding: var(--space-sm) var(--space-md);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--primary);
+      border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+      font-size: 1rem;
       font-style: italic;
-      color: #c9b8f5;
-      line-height: 1.65;
+      color: var(--text);
+      line-height: 1.7;
+      max-width: 38em;
     }
 
-    /* ─── Hero logo / wordmark ─────────────────────────────────── */
+    /* ═══ Wordmark & misc ═════════════════════════════════════════ */
     .wordmark {
-      font-size: clamp(4rem, 10vw, 8rem);
-      font-weight: 900;
+      font-family: 'Fraunces', Georgia, serif;
+      font-size: clamp(2.75rem, 7vw, 5rem);
+      font-weight: 700;
       letter-spacing: -0.04em;
       line-height: 1;
+      color: var(--text);
     }
-    .wordmark .ai { color: var(--accent1); }
-    .wordmark .my {
-      background: linear-gradient(90deg, var(--accent2), var(--accent1));
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-
-    /* ─── Pulse dot ────────────────────────────────────────────── */
+    .wordmark .ai,
+    .wordmark .my { color: var(--text); }
+    .wordmark .y { color: var(--primary); }
     .pulse-dot {
       display: inline-block;
-      width: 10px; height: 10px;
-      background: var(--accent3);
+      width: 6px; height: 6px;
+      background: var(--success);
       border-radius: 50%;
-      box-shadow: 0 0 0 0 rgba(72,187,120,0.5);
-      animation: pulse-anim 2s ease-in-out infinite;
-    }
-    @keyframes pulse-anim {
-      0%   { box-shadow: 0 0 0 0 rgba(72,187,120,0.5); }
-      70%  { box-shadow: 0 0 0 10px rgba(72,187,120,0); }
-      100% { box-shadow: 0 0 0 0 rgba(72,187,120,0); }
+      opacity: 0.9;
     }
 
-    /* ─── Waveform decoration ──────────────────────────────────── */
-    .waveform {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      height: 48px;
-      margin-top: 28px;
-    }
-    .wave-bar {
-      width: 4px;
-      border-radius: 2px;
-      background: var(--accent1);
-      animation: wave-anim 1.2s ease-in-out infinite;
-      opacity: 0.7;
-    }
-    .wave-bar:nth-child(2n)   { background: var(--accent2); }
-    .wave-bar:nth-child(3n)   { background: var(--accent3); }
-    @keyframes wave-anim {
-      0%,100% { height: 8px; }
-      50%     { height: 40px; }
-    }
-
-    /* ─── Navigation ───────────────────────────────────────────── */
+    /* ═══ Nav & progress ══════════════════════════════════════════ */
     .nav {
       position: fixed;
-      bottom: 36px;
+      bottom: var(--space-lg);
       left: 50%;
       transform: translateX(-50%);
       display: flex;
       align-items: center;
-      gap: 16px;
-      background: rgba(13,18,32,0.85);
-      backdrop-filter: blur(12px);
+      gap: var(--space-sm);
+      background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 999px;
-      padding: 10px 20px;
+      border-radius: var(--radius-lg);
+      padding: var(--space-xs) var(--space-md);
       z-index: 100;
     }
     .nav-btn {
-      width: 36px; height: 36px;
+      width: 28px; height: 28px;
       border-radius: 50%;
       border: 1px solid var(--border);
-      background: rgba(99,179,237,0.08);
-      color: var(--accent1);
-      font-size: 1rem;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 0.8125rem;
       cursor: pointer;
       display: flex; align-items: center; justify-content: center;
-      transition: background 0.2s, transform 0.2s;
+      transition: background 0.2s, color 0.2s, border-color 0.2s;
     }
-    .nav-btn:hover { background: rgba(99,179,237,0.2); transform: scale(1.1); }
-    .nav-counter {
-      font-size: 0.82rem;
-      color: var(--muted);
-      min-width: 52px;
-      text-align: center;
-      font-variant-numeric: tabular-nums;
-    }
-    .nav-dots { display: flex; gap: 6px; }
+    .nav-btn:hover { background: var(--surface-elevated); color: var(--primary); border-color: var(--border-focus); }
+    .nav-counter { font-size: 0.75rem; color: var(--text-muted); min-width: 40px; text-align: center; font-variant-numeric: tabular-nums; }
+    .nav-dots { display: flex; gap: 4px; align-items: center; }
     .nav-dot {
-      width: 6px; height: 6px;
+      width: 4px; height: 4px;
       border-radius: 50%;
-      background: var(--muted);
+      background: var(--text-dim);
       cursor: pointer;
-      transition: background 0.2s, transform 0.2s;
+      transition: background 0.2s, width 0.2s;
     }
-    .nav-dot.active { background: var(--accent1); transform: scale(1.4); }
-
-    /* ─── Progress bar ─────────────────────────────────────────── */
+    .nav-dot.active { background: var(--primary); width: 14px; border-radius: 999px; }
     .progress {
       position: fixed;
       top: 0; left: 0;
-      height: 3px;
-      background: linear-gradient(90deg, var(--accent1), var(--accent2));
-      transition: width 0.4s ease;
+      height: 2px;
+      background: var(--border-focus);
+      transition: width 0.3s var(--ease);
       z-index: 100;
-      border-radius: 0 2px 2px 0;
+      border-radius: 0 1px 1px 0;
     }
+    .slide-num { position: fixed; top: var(--space-md); right: 5vw; font-size: 0.75rem; color: var(--text-muted); z-index: 100; font-variant-numeric: tabular-nums; }
 
-    /* ─── Slide number ─────────────────────────────────────────── */
-    .slide-num {
-      position: fixed;
-      top: 20px; right: 28px;
-      font-size: 0.75rem;
-      color: var(--muted);
-      z-index: 100;
-      font-variant-numeric: tabular-nums;
-    }
-
-    /* ─── CTA slide ────────────────────────────────────────────── */
+    /* ═══ CTA & layout ════════════════════════════════════════════ */
     .cta-box {
+      margin-top: var(--space-md);
+      padding: var(--space-lg) var(--space-xl);
+      background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 20px;
-      padding: 40px 50px;
-      background: linear-gradient(135deg, rgba(99,179,237,0.06), rgba(159,122,234,0.06));
+      border-radius: var(--radius-md);
       text-align: center;
-      margin-top: 36px;
+      transition: border-color 0.2s;
     }
+    .cta-box:hover { border-color: var(--border-focus); }
     .cta-cmd {
-      font-family: 'Cascadia Code', 'Fira Code', monospace;
-      font-size: 1.1rem;
-      color: var(--accent3);
-      background: rgba(0,0,0,0.3);
-      border-radius: 8px;
-      padding: 10px 24px;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.8125rem;
+      color: var(--success);
+      background: var(--surface-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: var(--space-xs) var(--space-sm);
       display: inline-block;
-      margin-top: 16px;
+      margin-top: var(--space-sm);
     }
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-xl); align-items: start; margin-top: var(--space-md); }
+    .divider { width: 40px; height: 2px; background: var(--primary); border-radius: 1px; margin: var(--space-sm) 0; opacity: 0.85; }
 
-    /* ─── Two-col layout ───────────────────────────────────────── */
-    .two-col {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 50px;
-      align-items: start;
-      margin-top: 30px;
+    /* ═══ Stack grid (optional) ═══════════════════════════════════ */
+    .stack-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-sm); margin-top: var(--space-md); }
+    .stack-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: var(--space-sm);
+      text-align: center;
+      transition: border-color 0.2s;
     }
+    .stack-item:nth-child(1) { border-left: 3px solid var(--primary); }
+    .stack-item:nth-child(2),
+    .stack-item:nth-child(3),
+    .stack-item:nth-child(4) { border-left: 3px solid var(--border-focus); }
+    .stack-item:hover { border-color: var(--border-focus); }
+    .stack-item .stack-icon { font-size: 1.5rem; margin-bottom: var(--space-xs); opacity: 0.9; }
+    .stack-item .stack-name { font-family: 'Source Sans 3', system-ui, sans-serif; font-size: 0.8125rem; font-weight: 600; color: var(--text); }
+    .stack-item .stack-desc { font-size: 0.6875rem; color: var(--text-dim); margin-top: 4px; }
 
-    /* ─── Divider ──────────────────────────────────────────────── */
-    .divider {
-      width: 60px; height: 3px;
-      background: linear-gradient(90deg, var(--accent1), var(--accent2));
-      border-radius: 2px;
-      margin: 18px 0;
-    }
-
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(6px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-
-    /* keyboard hint */
-    .kbd-hint {
-      position: fixed;
-      bottom: 90px;
-      right: 28px;
-      font-size: 0.7rem;
-      color: var(--muted);
-      opacity: 0.6;
-    }
+    .kbd-hint { position: fixed; bottom: 80px; right: 5vw; font-size: 0.6875rem; color: var(--text-muted); opacity: 0.9; z-index: 100; }
   </style>
 </head>
 <body>
@@ -544,37 +437,20 @@
   <!-- ══════════════════════════════════════════════
        SLIDE 1 — HERO
   ══════════════════════════════════════════════ -->
-  <div class="slide slide-hero active" id="s0">
-    <div class="mesh"></div>
-    <div class="content" style="text-align:center;">
-      <div class="wordmark"><span class="ai">AI</span><span class="my">My</span></div>
-      <div class="divider" style="margin:24px auto;"></div>
-      <p class="subtitle" style="font-size:1.4rem;max-width:680px;margin:0 auto;">
-        Your in-store AI shopping assistant —<br>
-        <span style="color:var(--accent1);">press a button</span>, <span style="color:var(--accent2);">speak your project</span>, <span style="color:var(--accent3);">walk a perfect route</span>
+  <div class="slide slide--hero active" id="s0">
+    <div class="content content--center">
+      <div class="wordmark"><span class="ai">AI</span><span class="my">M</span><span class="y">y</span></div>
+      <div class="divider" style="margin:var(--space-md) auto;"></div>
+      <p class="subtitle" style="max-width:32rem;margin:0 auto;">
+        Ask for what you need.
       </p>
-      <div class="waveform" style="justify-content:center;margin-top:40px;">
-        <div class="wave-bar" style="height:12px;animation-delay:0s"></div>
-        <div class="wave-bar" style="height:28px;animation-delay:0.1s"></div>
-        <div class="wave-bar" style="height:20px;animation-delay:0.2s"></div>
-        <div class="wave-bar" style="height:36px;animation-delay:0.3s"></div>
-        <div class="wave-bar" style="height:24px;animation-delay:0.4s"></div>
-        <div class="wave-bar" style="height:16px;animation-delay:0.5s"></div>
-        <div class="wave-bar" style="height:40px;animation-delay:0.6s"></div>
-        <div class="wave-bar" style="height:20px;animation-delay:0.7s"></div>
-        <div class="wave-bar" style="height:32px;animation-delay:0.8s"></div>
-        <div class="wave-bar" style="height:14px;animation-delay:0.9s"></div>
-        <div class="wave-bar" style="height:28px;animation-delay:1.0s"></div>
-        <div class="wave-bar" style="height:8px;animation-delay:1.1s"></div>
-        <div class="wave-bar" style="height:36px;animation-delay:1.2s"></div>
-        <div class="wave-bar" style="height:22px;animation-delay:1.3s"></div>
-        <div class="wave-bar" style="height:16px;animation-delay:1.4s"></div>
-      </div>
-      <div class="chip-row" style="justify-content:center;margin-top:36px;">
-        <span class="chip">&#128722; In-Store</span>
-        <span class="chip violet">&#129302; Claude-Powered</span>
-        <span class="chip green">&#9989; Smart Shopping List</span>
-        <span class="chip amber">&#128205; Optimized Route</span>
+      <p style="max-width:28rem;margin:var(--space-md) auto 0;font-size:0.9375rem;line-height:1.6;color:var(--text-muted);">
+        Voice AI at the store entrance. One button, your list, your route, and your total—no app required.
+      </p>
+      <div class="chip-row" style="justify-content:center;margin-top:var(--space-lg);">
+        <span class="chip">In-Store</span>
+        <span class="chip">Voice-first</span>
+        <span class="chip">No app</span>
       </div>
     </div>
   </div>
@@ -582,31 +458,17 @@
   <!-- ══════════════════════════════════════════════
        SLIDE 2 — THE PROBLEM
   ══════════════════════════════════════════════ -->
-  <div class="slide slide-dark" id="s1">
-    <div class="mesh"></div>
+  <div class="slide" id="s1">
     <div class="content">
-      <p class="eyebrow">The Problem</p>
-      <h2>Big box stores are <span class="grad-text">frustrating</span></h2>
-      <div class="divider"></div>
-      <div class="cards cards-3" style="margin-top:30px;">
-        <div class="card">
-          <div class="card-icon">&#128148;</div>
-          <h3>No Help When You Need It</h3>
-          <p>Associates are hard to find. Customers wander aisles for 20+ minutes searching for a single item.</p>
-        </div>
-        <div class="card">
-          <div class="card-icon">&#9200;</div>
-          <h3>Wasted Trips</h3>
-          <p>Customers leave without half their list — wrong quantities, missing items, forgotten supplies for their project.</p>
-        </div>
-        <div class="card">
-          <div class="card-icon">&#128722;</div>
-          <h3>Backtracking the Store</h3>
-          <p>Zigzagging from lumber to paint to hardware and back again. Inefficient routes kill shopping momentum.</p>
-        </div>
-      </div>
+      <p class="eyebrow">Why it’s broken</p>
+      <h2>Stores are huge. Help isn’t.</h2>
+      <p style="margin-top:var(--space-sm);margin-bottom:var(--space-md);max-width:32rem;">No one around when you need them. Wrong list, wrong route, another trip tomorrow.</p>
       <div class="callout">
-        "Customers come in knowing what they want to build — but leave unsure if they got everything they need."
+        "Customers come in knowing what they want to build — but leave unsure if they got everything they need." — store manager
+      </div>
+      <div class="slide-video" style="margin-top:var(--space-lg);">
+        <video src="Store_Layout_Video_Generation.mp4" controls loop muted playsinline preload="auto"></video>
+        <p class="slide-video-caption">Store layout and optimized route</p>
       </div>
     </div>
   </div>
@@ -614,16 +476,14 @@
   <!-- ══════════════════════════════════════════════
        SLIDE 3 — THE SOLUTION
   ══════════════════════════════════════════════ -->
-  <div class="slide slide-blue" id="s2">
-    <div class="mesh"></div>
+  <div class="slide" id="s2">
     <div class="content">
-      <p class="eyebrow">The Solution</p>
-      <h2>Meet <span class="grad-text">AIMy</span></h2>
+      <h2>This is <span class="grad-text">AIMy</span></h2>
       <div class="divider"></div>
       <div class="two-col">
         <div>
-          <p style="font-size:1.1rem;color:#cbd5e0;line-height:1.8;margin-bottom:24px;">
-            AIMy is a <strong style="color:var(--accent1);">voice AI shopping assistant</strong> stationed at the store entrance. Customers press the Easy Button, describe what they need, and AIMy does the rest — instantly.
+          <p style="margin-bottom:var(--space-md);">
+            AIMy is a <strong style="color:var(--primary);">voice AI shopping assistant</strong> stationed at the store entrance. Customers press the Easy Button, describe what they need, and AIMy does the rest — instantly.
           </p>
           <ul class="feat-list">
             <li><span class="bullet"></span>Tell AIMy your project or question</li>
@@ -633,13 +493,15 @@
           </ul>
         </div>
         <div>
-          <div class="card" style="padding:32px;text-align:center;">
-            <div style="font-size:5rem;margin-bottom:16px;">&#128994;</div>
-            <h3 style="font-size:1.6rem;margin-bottom:12px;color:var(--accent4);">Easy Button</h3>
+          <div class="card" style="padding:var(--space-lg);text-align:center;">
+            <div class="card-img-wrap" style="margin:0 auto var(--space-sm);width:100%;max-width:180px;aspect-ratio:1;border-radius:var(--radius-sm);overflow:hidden;background:var(--surface-elevated);display:flex;align-items:center;justify-content:center;">
+              <img class="card-img" src="https://upload.wikimedia.org/wikipedia/commons/9/92/Easy_button.JPG" alt="Staples Easy Button — one press at the entrance" decoding="async" style="width:100%;height:100%;object-fit:contain;display:block;">
+            </div>
+            <h3 style="font-size:1.25rem;margin-bottom:var(--space-sm);color:var(--primary);">Easy Button</h3>
             <p>One press activates AIMy. No app download, no login, no screen — just your voice and an instant answer.</p>
-            <div style="margin-top:24px;display:flex;align-items:center;justify-content:center;gap:10px;">
+            <div style="margin-top:var(--space-md);display:flex;align-items:center;justify-content:center;gap:var(--space-xs);">
               <span class="pulse-dot"></span>
-              <span style="font-size:0.85rem;color:var(--accent3);">Always ready at the entrance</span>
+              <span style="font-size:0.8125rem;color:var(--success);">Always ready at the entrance</span>
             </div>
           </div>
         </div>
@@ -650,419 +512,82 @@
   <!-- ══════════════════════════════════════════════
        SLIDE 4 — HOW IT WORKS (WORKFLOW)
   ══════════════════════════════════════════════ -->
-  <div class="slide slide-dark" id="s3">
-    <div class="mesh"></div>
+  <div class="slide" id="s3">
     <div class="content">
-      <p class="eyebrow">How It Works</p>
+      <p class="eyebrow">Under the hood</p>
       <h2>Five steps to a <span class="grad-text">perfect shopping trip</span></h2>
       <div class="divider"></div>
-      <div class="pipeline" style="margin-top:36px;">
-        <div class="pipe-step">
-          <div class="pipe-box highlight2" style="background:linear-gradient(135deg,rgba(246,173,85,0.18),var(--card));border-color:var(--accent4);">
-            <span class="pipe-icon">&#128994;</span>
-            Easy Button
-          </div>
-          <div class="pipe-label">Customer presses button at store entrance</div>
-        </div>
-        <div class="pipe-arrow">&#8594;</div>
-        <div class="pipe-step">
-          <div class="pipe-box highlight2">
-            <span class="pipe-icon">&#127908;</span>
-            AIMy Asks
-          </div>
-          <div class="pipe-label">Voice conversation about what they need</div>
-        </div>
-        <div class="pipe-arrow">&#8594;</div>
-        <div class="pipe-step">
-          <div class="pipe-box highlight">
-            <span class="pipe-icon">&#129302;</span>
-            AI Thinks
-          </div>
-          <div class="pipe-label">Claude maps needs to store inventory</div>
-        </div>
-        <div class="pipe-arrow">&#8594;</div>
-        <div class="pipe-step">
-          <div class="pipe-box" style="border-color:var(--accent3);background:linear-gradient(135deg,rgba(72,187,120,0.12),var(--card));">
-            <span class="pipe-icon">&#9989;</span>
-            Item List
-          </div>
-          <div class="pipe-label">Complete list with quantities &amp; aisle numbers</div>
-        </div>
-        <div class="pipe-arrow">&#8594;</div>
-        <div class="pipe-step">
-          <div class="pipe-box" style="border-color:var(--accent2);background:linear-gradient(135deg,rgba(159,122,234,0.12),var(--card));">
-            <span class="pipe-icon">&#128205;</span>
-            Route + $
-          </div>
-          <div class="pipe-label">Optimized path &amp; estimated subtotal</div>
-        </div>
-      </div>
-      <div class="cards cards-3" style="margin-top:28px;">
-        <div class="card">
-          <h3>&#128196; Share a Project</h3>
-          <p>"I'm building a 12×16 deck" — AIMy calculates lumber, hardware, fasteners, and finish.</p>
-        </div>
-        <div class="card">
-          <h3>&#10067; Ask a Question</h3>
-          <p>"What do I need to patch drywall?" — AIMy recommends the right products and quantities.</p>
-        </div>
-        <div class="card">
-          <h3>&#128203; Give a List</h3>
-          <p>"I need paint, brushes, and drop cloths" — AIMy finds exact items and adds what you might have missed.</p>
-        </div>
-      </div>
+      <ol class="steps-list">
+        <li><strong>Easy Button</strong> — Customer presses at the door.</li>
+        <li><strong>AIMy asks</strong> — Voice conversation about what they need.</li>
+        <li><strong>AI thinks</strong> — Claude maps needs to store inventory.</li>
+        <li><strong>Item list</strong> — Quantities, aisles, prices.</li>
+        <li><strong>Route + total</strong> — Optimized path and estimated subtotal.</li>
+      </ol>
+      <p style="margin-top:var(--space-lg);font-size:1rem;color:var(--text);">Say a project (“I’m building a 12×16 deck”), ask a question (“What do I need to patch drywall?”), or give a list — AIMy fills in the rest.</p>
     </div>
   </div>
 
   <!-- ══════════════════════════════════════════════
-       SLIDE 5 — LIVE CONVERSATION DEMO
+       SLIDE 5 — WHAT YOU GET
   ══════════════════════════════════════════════ -->
-  <div class="slide slide-violet" id="s4">
-    <div class="mesh"></div>
-    <div class="content" style="max-width:1000px;">
-      <p class="eyebrow">See It In Action</p>
-      <h2>A real <span class="grad-text">conversation</span></h2>
+  <div class="slide" id="s4">
+    <div class="content">
+      <p class="eyebrow">The payoff</p>
+      <h2>Three outputs, <span class="grad-text">one conversation</span></h2>
       <div class="divider"></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:28px;">
-        <!-- Left: terminal mock -->
-        <div style="background:#0a0e1a;border:1px solid var(--border);border-radius:16px;padding:24px 26px;font-family:'Cascadia Code','Fira Code',monospace;font-size:0.82rem;line-height:1.8;color:#a0aec0;">
-          <div style="color:var(--accent4);margin-bottom:10px;font-weight:700;">&#128994; Easy Button Pressed</div>
-          <div style="color:var(--muted);">─────────────────────────────</div>
-          <div style="color:var(--accent1);margin-top:10px;animation:fadeIn 0.5s 0.3s both;">AIMy: "Hi! I'm AIMy. What are you</div>
-          <div style="color:var(--accent1);animation:fadeIn 0.5s 0.5s both;">&nbsp;&nbsp;working on today?"</div>
-          <div style="color:#e2e8f0;margin-top:8px;animation:fadeIn 0.5s 1.2s both;">You: "I'm building a 12 by 16 foot</div>
-          <div style="color:#e2e8f0;animation:fadeIn 0.5s 1.4s both;">&nbsp;&nbsp;pressure-treated deck."</div>
-          <div style="color:var(--accent1);margin-top:8px;animation:fadeIn 0.5s 2.2s both;">AIMy: "Got it! For a 192 sq ft deck,</div>
-          <div style="color:var(--accent1);animation:fadeIn 0.5s 2.5s both;">&nbsp;&nbsp;I'm building your list now.</div>
-          <div style="color:var(--accent1);animation:fadeIn 0.5s 2.8s both;">&nbsp;&nbsp;Will you need concrete for posts?"</div>
-          <div style="color:#e2e8f0;margin-top:8px;animation:fadeIn 0.5s 3.5s both;">You: "Yes, I need 6 post holes."</div>
-          <div style="color:var(--accent3);margin-top:10px;font-weight:700;animation:fadeIn 0.5s 4.2s both;">✓ List ready — 14 items, $847 est.</div>
+      <div class="cards cards-3">
+        <div class="card card--accent">
+          <img class="card-img" src="https://images.unsplash.com/photo-1753715613651-749ef230482c?w=320&h=120&fit=crop" alt="Checklist — items with quantities and aisles">
+          <h3 style="color:var(--primary);">Smart Shopping List</h3>
+          <p>Every item with exact quantities, aisle numbers, and prices — tailored to your project dimensions.</p>
+          <div style="margin-top:var(--space-sm);font-size:0.8125rem;color:var(--text-muted);font-weight:600;">Text or print at kiosk</div>
         </div>
-        <!-- Right: what AIMy is doing -->
-        <div style="display:flex;flex-direction:column;gap:16px;">
-          <div class="card" style="border-color:rgba(159,122,234,0.4);padding:20px 22px;">
-            <h3 style="color:var(--accent2);">&#129302; Understanding Context</h3>
-            <p style="font-size:0.9rem;">Interprets "12×16 deck" → calculates board feet, joist spacing, beam sizing, and post count automatically.</p>
-          </div>
-          <div class="card" style="border-color:rgba(72,187,120,0.4);padding:20px 22px;">
-            <h3 style="color:var(--accent3);">&#128722; Matching Store Inventory</h3>
-            <p style="font-size:0.9rem;">Maps every item to this store's SKUs, confirms availability, and notes substitutions if something is out of stock.</p>
-          </div>
-          <div class="card" style="border-color:rgba(246,173,85,0.4);padding:20px 22px;">
-            <h3 style="color:var(--accent4);">&#10067; Asks the Right Questions</h3>
-            <p style="font-size:0.9rem;">Proactively asks about posts, stairs, railing, and finish so nothing is forgotten before the customer leaves.</p>
-          </div>
+        <div class="card card--secondary">
+          <img class="card-img" src="https://images.unsplash.com/photo-1569336415962-a4bd9f69cd83?w=320&h=120&fit=crop" alt="Store aisle — one clean sweep, no backtracking">
+          <h3 style="color:var(--text);">Optimized Route</h3>
+          <p>One clean sweep through the store — no backtracking. Heavy items first, checkout last.</p>
+          <div style="margin-top:var(--space-sm);font-size:0.8125rem;color:var(--text-muted);font-weight:600;">20 min avg vs 60 min without</div>
+        </div>
+        <div class="card card--success">
+          <img class="card-img" src="https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=320&h=120&fit=crop" alt="Receipt and total — know your subtotal before you shop">
+          <h3 style="color:var(--text);">Instant Subtotal</h3>
+          <p>Know your budget before you grab a single item — exact quantities, no guessing, no surprise at checkout.</p>
+          <div style="margin-top:var(--space-sm);font-size:0.8125rem;color:var(--text-muted);font-weight:600;">67% fewer return trips</div>
         </div>
       </div>
-    </div>
-  </div>
-
-  <!-- ══════════════════════════════════════════════
-       SLIDE 6 — SMART SHOPPING LIST
-  ══════════════════════════════════════════════ -->
-  <div class="slide slide-dark" id="s5">
-    <div class="mesh"></div>
-    <div class="content" style="max-width:1000px;">
-      <p class="eyebrow">Output #1</p>
-      <h2>Your complete <span class="grad-text-green">shopping list</span></h2>
-      <div class="divider"></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-top:28px;">
-        <!-- Generated list -->
-        <div style="background:#0a0e1a;border:1px solid rgba(72,187,120,0.3);border-radius:16px;padding:24px;">
-          <div style="font-size:0.75rem;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;color:var(--accent3);margin-bottom:16px;">AIMy — Deck Project List</div>
-          <table style="width:100%;border-collapse:collapse;font-size:0.85rem;">
-            <thead>
-              <tr style="color:var(--muted);font-size:0.72rem;text-transform:uppercase;letter-spacing:0.08em;border-bottom:1px solid var(--border);">
-                <td style="padding:6px 0;">Item</td>
-                <td style="padding:6px 0;text-align:center;">Qty</td>
-                <td style="padding:6px 0;text-align:right;">Price</td>
-              </tr>
-            </thead>
-            <tbody style="color:#cbd5e0;">
-              <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
-                <td style="padding:8px 0;">2×10×16 PT Lumber</td>
-                <td style="padding:8px 0;text-align:center;">18</td>
-                <td style="padding:8px 0;text-align:right;color:var(--accent1);">$342</td>
-              </tr>
-              <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
-                <td style="padding:8px 0;">5/4×6×16 Deck Boards</td>
-                <td style="padding:8px 0;text-align:center;">40</td>
-                <td style="padding:8px 0;text-align:right;color:var(--accent1);">$280</td>
-              </tr>
-              <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
-                <td style="padding:8px 0;">4×4×10 PT Posts</td>
-                <td style="padding:8px 0;text-align:center;">6</td>
-                <td style="padding:8px 0;text-align:right;color:var(--accent1);">$78</td>
-              </tr>
-              <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
-                <td style="padding:8px 0;">60lb Concrete Mix</td>
-                <td style="padding:8px 0;text-align:center;">18</td>
-                <td style="padding:8px 0;text-align:right;color:var(--accent1);">$72</td>
-              </tr>
-              <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
-                <td style="padding:8px 0;">Joist Hanger Kit</td>
-                <td style="padding:8px 0;text-align:center;">1</td>
-                <td style="padding:8px 0;text-align:right;color:var(--accent1);">$38</td>
-              </tr>
-              <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
-                <td style="padding:8px 0;">Deck Screws 5lb</td>
-                <td style="padding:8px 0;text-align:center;">2</td>
-                <td style="padding:8px 0;text-align:right;color:var(--accent1);">$37</td>
-              </tr>
-              <tr>
-                <td colspan="2" style="padding:12px 0;font-weight:700;color:var(--text);">Estimated Total</td>
-                <td style="padding:12px 0;text-align:right;font-size:1.2rem;font-weight:800;color:var(--accent3);">$847</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <!-- Features -->
-        <div style="display:flex;flex-direction:column;gap:18px;">
-          <div class="card" style="padding:20px 22px;">
-            <h3>&#128260; Project-Aware Quantities</h3>
-            <p style="font-size:0.9rem;">AIMy calculates exact quantities from your project dimensions — no guessing, no overbuying, no return trips.</p>
-          </div>
-          <div class="card" style="padding:20px 22px;">
-            <h3>&#128196; Aisle Numbers Included</h3>
-            <p style="font-size:0.9rem;">Every item includes the exact aisle and bay location in this store so customers never search blind.</p>
-          </div>
-          <div class="card" style="padding:20px 22px;">
-            <h3>&#128241; Text or Print</h3>
-            <p style="font-size:0.9rem;">List is texted to the customer's phone or printed at the kiosk — ready to carry through the store.</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ══════════════════════════════════════════════
-       SLIDE 7 — STORE ROUTE
-  ══════════════════════════════════════════════ -->
-  <div class="slide slide-blue" id="s6">
-    <div class="mesh"></div>
-    <div class="content" style="max-width:1000px;">
-      <p class="eyebrow">Output #2</p>
-      <h2>Optimized <span class="grad-text">store route</span></h2>
-      <div class="divider"></div>
-      <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:28px;margin-top:28px;">
-        <!-- Route map mock -->
-        <div style="background:#0a0e1a;border:1px solid var(--border);border-radius:16px;padding:24px;position:relative;">
-          <div style="font-size:0.72rem;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;color:var(--accent1);margin-bottom:16px;">Store Route — Deck Project</div>
-          <!-- Route steps -->
-          <div style="display:flex;flex-direction:column;gap:0;">
-            <div style="display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.06);">
-              <div style="width:32px;height:32px;border-radius:50%;background:var(--accent4);display:flex;align-items:center;justify-content:center;font-weight:800;color:#000;font-size:0.85rem;flex-shrink:0;">1</div>
-              <div>
-                <div style="font-weight:600;color:var(--text);font-size:0.9rem;">Garden Center — Concrete</div>
-                <div style="font-size:0.75rem;color:var(--muted);">Aisle GC-3 · 18× 60lb Concrete Mix</div>
-              </div>
-            </div>
-            <div style="display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.06);">
-              <div style="width:32px;height:32px;border-radius:50%;background:var(--accent1);display:flex;align-items:center;justify-content:center;font-weight:800;color:#000;font-size:0.85rem;flex-shrink:0;">2</div>
-              <div>
-                <div style="font-weight:600;color:var(--text);font-size:0.9rem;">Lumber — Posts &amp; Framing</div>
-                <div style="font-size:0.75rem;color:var(--muted);">Aisle L-1 · 4×4 Posts, 2×10 Joists</div>
-              </div>
-            </div>
-            <div style="display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.06);">
-              <div style="width:32px;height:32px;border-radius:50%;background:var(--accent1);display:flex;align-items:center;justify-content:center;font-weight:800;color:#000;font-size:0.85rem;flex-shrink:0;">3</div>
-              <div>
-                <div style="font-weight:600;color:var(--text);font-size:0.9rem;">Lumber — Deck Boards</div>
-                <div style="font-size:0.75rem;color:var(--muted);">Aisle L-4 · 40× 5/4×6 Boards</div>
-              </div>
-            </div>
-            <div style="display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.06);">
-              <div style="width:32px;height:32px;border-radius:50%;background:var(--accent3);display:flex;align-items:center;justify-content:center;font-weight:800;color:#000;font-size:0.85rem;flex-shrink:0;">4</div>
-              <div>
-                <div style="font-weight:600;color:var(--text);font-size:0.9rem;">Hardware — Fasteners</div>
-                <div style="font-size:0.75rem;color:var(--muted);">Aisle 14 · Joist Hangers, Deck Screws</div>
-              </div>
-            </div>
-            <div style="display:flex;align-items:center;gap:14px;padding:12px 0;">
-              <div style="width:32px;height:32px;border-radius:50%;background:var(--accent2);display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;font-size:0.85rem;flex-shrink:0;">5</div>
-              <div>
-                <div style="font-weight:600;color:var(--text);font-size:0.9rem;">Checkout</div>
-                <div style="font-size:0.75rem;color:var(--muted);">Pro Desk or Self-Checkout · Est. $847</div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <!-- Why it matters -->
-        <div style="display:flex;flex-direction:column;gap:18px;">
-          <div class="card" style="padding:20px 22px;">
-            <h3>&#9889; Minimum Backtracking</h3>
-            <p style="font-size:0.9rem;">Items are sorted by store zone and visited in one clean sweep — no backtracking across the store.</p>
-          </div>
-          <div class="card" style="padding:20px 22px;">
-            <h3>&#128230; Cart-Load Aware</h3>
-            <p style="font-size:0.9rem;">Heavy items like concrete are queued first so the flatbed can be picked up at the start of the route.</p>
-          </div>
-          <div class="card" style="padding:20px 22px;">
-            <h3>&#128336; 20 Min vs 60 Min</h3>
-            <p style="font-size:0.9rem;">Customers with a route average a 20-minute trip. Without one, average time is over an hour for complex projects.</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ══════════════════════════════════════════════
-       SLIDE 8 — SUBTOTAL & VALUE
-  ══════════════════════════════════════════════ -->
-  <div class="slide slide-dark" id="s7">
-    <div class="mesh"></div>
-    <div class="content" style="max-width:960px;">
-      <p class="eyebrow">Output #3</p>
-      <h2>Know your budget <span class="grad-text">before checkout</span></h2>
-      <div class="divider"></div>
-      <div class="cards cards-2" style="margin-top:28px;">
-        <div class="card" style="border-color:rgba(99,179,237,0.3);">
-          <h3 style="color:var(--muted);font-size:0.8rem;font-weight:500;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:16px;">Without AIMy</h3>
-          <ul class="feat-list">
-            <li><span style="color:#fc8181;font-size:1rem;">✗</span> &nbsp;Discover total only at checkout</li>
-            <li><span style="color:#fc8181;font-size:1rem;">✗</span> &nbsp;Buy wrong quantities — over or under</li>
-            <li><span style="color:#fc8181;font-size:1rem;">✗</span> &nbsp;Return trip for missing items</li>
-            <li><span style="color:#fc8181;font-size:1rem;">✗</span> &nbsp;No confidence the list is complete</li>
-          </ul>
-        </div>
-        <div class="card" style="border-color:rgba(72,187,120,0.4);background:linear-gradient(135deg,rgba(72,187,120,0.06),var(--card));">
-          <h3 style="color:var(--accent3);font-size:0.8rem;font-weight:500;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:16px;">With AIMy</h3>
-          <ul class="feat-list">
-            <li><span style="color:var(--accent3);font-size:1rem;">✓</span> &nbsp;Estimated subtotal before you shop</li>
-            <li><span style="color:var(--accent3);font-size:1rem;">✓</span> &nbsp;Exact quantities for your project</li>
-            <li><span style="color:var(--accent3);font-size:1rem;">✓</span> &nbsp;Complete list — nothing forgotten</li>
-            <li><span style="color:var(--accent3);font-size:1rem;">✓</span> &nbsp;Confident, focused shopping trip</li>
-          </ul>
-        </div>
-      </div>
-      <div style="margin-top:28px;display:flex;gap:24px;">
-        <div class="stat" style="flex:1;">
+      <div class="stats stats--feature">
+        <div class="stat stat--main">
           <div class="stat-num grad-text">3×</div>
-          <div class="stat-label">more items per trip with AIMy</div>
+          <div class="stat-label">more items per trip</div>
         </div>
-        <div class="stat" style="flex:1;">
-          <div class="stat-num" style="color:var(--accent3);">67%</div>
-          <div class="stat-label">reduction in return trips</div>
-        </div>
-        <div class="stat" style="flex:1;">
-          <div class="stat-num" style="color:var(--accent4);">20 min</div>
-          <div class="stat-label">average time saved per visit</div>
-        </div>
+        <p class="stats-inline">67% fewer return trips · 20 min saved per visit · 0 apps to download</p>
       </div>
     </div>
   </div>
 
   <!-- ══════════════════════════════════════════════
-       SLIDE 9 — TECH STACK
+       SLIDE 6 — CTA / CLOSE
   ══════════════════════════════════════════════ -->
-  <div class="slide slide-blue" id="s8">
-    <div class="mesh"></div>
-    <div class="content">
-      <p class="eyebrow">Technology</p>
-      <h2>Built on <span class="grad-text">world-class stack</span></h2>
-      <div class="divider"></div>
-      <div class="stack-grid">
-        <div class="stack-item">
-          <div class="stack-icon">&#129302;</div>
-          <div class="stack-name">Claude Opus 4.6</div>
-          <div class="stack-desc">Project reasoning &amp; item lookup</div>
-        </div>
-        <div class="stack-item">
-          <div class="stack-icon">&#128297;</div>
-          <div class="stack-name">Pipecat</div>
-          <div class="stack-desc">Real-time voice AI framework</div>
-        </div>
-        <div class="stack-item">
-          <div class="stack-icon">&#128266;</div>
-          <div class="stack-name">Silero VAD</div>
-          <div class="stack-desc">Neural voice activity detection</div>
-        </div>
-        <div class="stack-item">
-          <div class="stack-icon">&#127760;</div>
-          <div class="stack-name">Daily.co</div>
-          <div class="stack-desc">WebRTC kiosk audio</div>
-        </div>
-        <div class="stack-item">
-          <div class="stack-icon">&#128013;</div>
-          <div class="stack-name">Python 3</div>
-          <div class="stack-desc">asyncio-native runtime</div>
-        </div>
-        <div class="stack-item">
-          <div class="stack-icon">&#128722;</div>
-          <div class="stack-name">Store Inventory API</div>
-          <div class="stack-desc">Live SKU &amp; pricing data</div>
-        </div>
-        <div class="stack-item">
-          <div class="stack-icon">&#128205;</div>
-          <div class="stack-name">Store Map</div>
-          <div class="stack-desc">Aisle graph for route planning</div>
-        </div>
-        <div class="stack-item">
-          <div class="stack-icon">&#128241;</div>
-          <div class="stack-name">SMS / Print</div>
-          <div class="stack-desc">List delivery to customer</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ══════════════════════════════════════════════
-       SLIDE 10 — ROADMAP
-  ══════════════════════════════════════════════ -->
-  <div class="slide slide-dark" id="s9">
-    <div class="mesh"></div>
-    <div class="content">
-      <p class="eyebrow">Vision</p>
-      <h2>What's <span class="grad-text">next</span></h2>
-      <div class="divider"></div>
-      <div class="cards cards-2" style="margin-top:28px;">
-        <div class="card">
-          <div class="card-icon">&#128293;</div>
-          <h3>Pro Account Integration</h3>
-          <p>Contractors log in and AIMy pulls their past projects, preferred brands, and bulk pricing automatically.</p>
-        </div>
-        <div class="card">
-          <div class="card-icon">&#128202;</div>
-          <h3>Real-Time Inventory</h3>
-          <p>Live stock levels per aisle — AIMy instantly suggests alternatives if an item is out of stock.</p>
-        </div>
-        <div class="card">
-          <div class="card-icon">&#128104;&#8205;&#128295;</div>
-          <h3>Expert Mode</h3>
-          <p>AIMy escalates to a live associate for complex installs — voice hand-off with full context already shared.</p>
-        </div>
-        <div class="card">
-          <div class="card-icon">&#128279;</div>
-          <h3>Cart &amp; Checkout</h3>
-          <p>Items added directly to a digital cart. Pay via kiosk or phone — zero waiting in line.</p>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ══════════════════════════════════════════════
-       SLIDE 11 — CTA / CLOSE
-  ══════════════════════════════════════════════ -->
-  <div class="slide slide-hero" id="s10">
-    <div class="mesh"></div>
-    <div class="content" style="text-align:center;max-width:800px;">
-      <p class="eyebrow">Let's Build It</p>
-      <div class="wordmark"><span class="ai">AI</span><span class="my">My</span></div>
+  <div class="slide slide--hero" id="s10">
+    <div class="content content--center content--narrow">
+      <p class="eyebrow">Try it</p>
+      <div class="wordmark"><span class="ai">AI</span><span class="my">M</span><span class="y">y</span></div>
       <p class="subtitle">Press the button. Describe your project.<br>Walk out with everything you need.</p>
       <div class="cta-box">
-        <p style="color:#a0aec0;font-size:1.05rem;margin-bottom:4px;">The smarter way to shop a hardware store</p>
-        <div style="font-size:3rem;margin:16px 0;">&#128994;</div>
-        <div style="font-size:1.2rem;font-weight:700;color:var(--accent4);">Press the Easy Button</div>
-        <div style="margin-top:24px;display:flex;align-items:center;justify-content:center;gap:10px;">
+        <p style="margin-bottom:4px;">One button at the door. No app.</p>
+        <div style="margin:0 auto var(--space-sm);max-width:180px;aspect-ratio:1;border-radius:var(--radius-sm);overflow:hidden;background:var(--surface-elevated);">
+          <img src="https://upload.wikimedia.org/wikipedia/commons/9/92/Easy_button.JPG" alt="Staples Easy Button" style="width:100%;height:100%;object-fit:contain;display:block;">
+        </div>
+        <div style="font-size:1.125rem;font-weight:700;color:var(--primary);">Press the Easy Button</div>
+        <div style="margin-top:var(--space-md);display:flex;align-items:center;justify-content:center;gap:var(--space-xs);">
           <span class="pulse-dot"></span>
-          <span style="font-size:0.9rem;color:var(--accent3);">AIMy is ready. What are you building?</span>
+          <span style="font-size:0.875rem;color:var(--success);">AIMy is ready. What are you building?</span>
         </div>
       </div>
-      <div class="chip-row" style="justify-content:center;margin-top:28px;">
-        <span class="chip">&#127908; Voice-Native</span>
-        <span class="chip violet">&#129302; Claude-Powered</span>
-        <span class="chip green">&#128205; Optimized Route</span>
-        <span class="chip amber">&#128176; Instant Subtotal</span>
+      <div class="chip-row" style="justify-content:center;">
+        <span class="chip">Voice-first</span>
+        <span class="chip">Claude-powered</span>
       </div>
     </div>
   </div>
@@ -1071,10 +596,10 @@
 
 <!-- ─── Navigation ──────────────────────────────────────── -->
 <div class="nav" id="nav">
-  <button class="nav-btn" id="prevBtn" onclick="navigate(-1)">&#8592;</button>
+  <button class="nav-btn" id="prevBtn" onclick="navigate(-1)" aria-label="Previous">←</button>
   <div class="nav-dots" id="dots"></div>
   <span class="nav-counter" id="counter"></span>
-  <button class="nav-btn" id="nextBtn" onclick="navigate(1)">&#8594;</button>
+  <button class="nav-btn" id="nextBtn" onclick="navigate(1)" aria-label="Next">→</button>
 </div>
 
 <div class="kbd-hint">← → arrow keys to navigate</div>
@@ -1105,10 +630,17 @@
     slideNum.textContent = (curr+1) + ' / ' + total;
     const pct = ((curr+1)/total)*100;
     progress.style.width = pct + '%';
+    slides.forEach((slide, i) => {
+      const vids = slide.querySelectorAll('video');
+      vids.forEach(v => { v.pause(); v.currentTime = 0; });
+    });
+    const activeVids = slides[curr].querySelectorAll('video');
+    activeVids.forEach(v => { v.muted = true; v.loop = true; v.play().catch(() => {}); });
   }
 
   function goTo(idx) {
     if (idx < 0 || idx >= total || idx === curr) return;
+    slides[curr].querySelectorAll('video').forEach(v => { v.pause(); });
     slides[curr].classList.remove('active');
     slides[curr].classList.add('exit');
     const prev = curr;
