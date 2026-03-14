@@ -1,6 +1,7 @@
 #include "main.h"
 
 #include <esp_event.h>
+#include <esp_system.h>
 #include <esp_log.h>
 #include <peer.h>
 
@@ -37,6 +38,12 @@ extern "C" void app_main(void) {
 
   while (1) {
     pipecat_screen_loop();
+    if (pipecat_screen_take_restart_request()) {
+      pipecat_screen_system_log("Restarting device...");
+      pipecat_screen_loop();
+      vTaskDelay(pdMS_TO_TICKS(150));
+      esp_restart();
+    }
     if (!webrtc_started && pipecat_screen_take_connect_request()) {
       pipecat_init_webrtc();
       webrtc_started = true;

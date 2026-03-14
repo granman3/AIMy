@@ -41,6 +41,7 @@ extern void pipecat_rtvi_handle_message(const char* msg);
 extern void pipecat_init_screen();
 extern void pipecat_screen_loop();
 extern bool pipecat_screen_take_connect_request();
+extern bool pipecat_screen_take_restart_request();
 extern void pipecat_screen_system_log(const char *text);
 extern void pipecat_screen_new_log();
 extern void pipecat_screen_log(const char *text);

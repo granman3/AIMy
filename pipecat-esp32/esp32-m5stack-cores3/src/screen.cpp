@@ -14,6 +14,7 @@ typedef struct {
   char status_text[STATUS_TEXT_MAX_LEN];
   char qr_text[QR_TEXT_MAX_LEN];
   bool connect_requested;
+  bool restart_requested;
   bool connect_started;
   bool is_connected;
   bool qr_visible;
@@ -38,8 +39,30 @@ static uint16_t color_button_outline() {
   return M5.Display.color565(205, 255, 246);
 }
 
+static uint16_t color_restart_button() {
+  return M5.Display.color565(255, 119, 87);
+}
+
+static uint16_t color_restart_outline() {
+  return M5.Display.color565(255, 214, 205);
+}
+
 static uint16_t color_muted_text() {
   return M5.Display.color565(168, 190, 216);
+}
+
+static void draw_restart_button(uint16_t bg) {
+  const int width = 92;
+  const int height = 28;
+  const int x = M5.Display.width() - width - 14;
+  const int y = 12;
+
+  M5.Display.fillRoundRect(x, y, width, height, 14, color_restart_button());
+  M5.Display.drawRoundRect(x, y, width, height, 14, color_restart_outline());
+  M5.Display.setTextColor(BLACK, color_restart_button());
+  M5.Display.setTextDatum(textdatum_t::middle_center);
+  M5.Display.setTextSize(1);
+  M5.Display.drawString("RESTART", x + (width / 2), y + (height / 2));
 }
 
 static void copy_text(char *dest, size_t dest_len, const char *src) {
@@ -84,6 +107,7 @@ static void draw_help_screen(const char *status_text) {
   M5.Display.setTextSize(1);
   M5.Display.setTextDatum(textdatum_t::top_center);
   M5.Display.drawCenterString("Pipecat ESP32 Helper", width / 2, 30);
+  draw_restart_button(bg);
   M5.Display.setTextColor(color_muted_text(), bg);
   M5.Display.drawCenterString("Tap the button or press a hardware key to call for help.",
                               width / 2, 82);
@@ -109,6 +133,7 @@ static void draw_connecting_screen(const char *status_text, bool is_connected) {
                                        : M5.Display.color565(255, 199, 80);
 
   M5.Display.fillScreen(bg);
+  draw_restart_button(bg);
   M5.Display.fillCircle(width / 2, 92, 28, accent);
   M5.Display.setTextColor(WHITE, bg);
   M5.Display.setTextDatum(textdatum_t::top_center);
@@ -131,6 +156,7 @@ static void draw_qr_screen(const char *qr_text, const char *status_text) {
   const int qr_y = 28;
 
   M5.Display.fillScreen(WHITE);
+  draw_restart_button(WHITE);
   M5.Display.setTextColor(BLACK, WHITE);
   M5.Display.setTextDatum(textdatum_t::top_center);
   M5.Display.setTextSize(2);
@@ -164,6 +190,16 @@ static bool point_in_help_button(int x, int y) {
          y <= button_y + button_height;
 }
 
+static bool point_in_restart_button(int x, int y) {
+  const int width = 92;
+  const int height = 28;
+  const int button_x = M5.Display.width() - width - 14;
+  const int button_y = 12;
+
+  return x >= button_x && x <= button_x + width && y >= button_y &&
+         y <= button_y + height;
+}
+
 static bool should_request_connect() {
   if (g_screen.connect_started || g_screen.qr_visible) {
     return false;
@@ -178,11 +214,17 @@ static bool should_request_connect() {
   return touch.wasClicked() && point_in_help_button(touch.x, touch.y);
 }
 
+static bool should_request_restart() {
+  auto touch = M5.Touch.getDetail();
+  return touch.wasClicked() && point_in_restart_button(touch.x, touch.y);
+}
+
 void pipecat_init_screen() {
   g_screen.mutex = xSemaphoreCreateMutex();
   copy_text(g_screen.status_text, sizeof(g_screen.status_text),
             "Initializing device...");
   g_screen.connect_requested = false;
+  g_screen.restart_requested = false;
   g_screen.connect_started = false;
   g_screen.is_connected = false;
   g_screen.qr_visible = false;
@@ -202,6 +244,12 @@ void pipecat_screen_loop() {
   }
 
   xSemaphoreTake(g_screen.mutex, portMAX_DELAY);
+  if (should_request_restart()) {
+    g_screen.restart_requested = true;
+    copy_text(g_screen.status_text, sizeof(g_screen.status_text),
+              "Restart requested...");
+    g_screen.dirty = true;
+  }
   if (should_request_connect()) {
     g_screen.connect_requested = true;
     g_screen.connect_started = true;
@@ -232,6 +280,21 @@ bool pipecat_screen_take_connect_request() {
   xSemaphoreGive(g_screen.mutex);
 
   return connect_requested;
+}
+
+bool pipecat_screen_take_restart_request() {
+  bool restart_requested = false;
+
+  if (g_screen.mutex == NULL) {
+    return false;
+  }
+
+  xSemaphoreTake(g_screen.mutex, portMAX_DELAY);
+  restart_requested = g_screen.restart_requested;
+  g_screen.restart_requested = false;
+  xSemaphoreGive(g_screen.mutex);
+
+  return restart_requested;
 }
 
 void pipecat_screen_system_log(const char *text) {

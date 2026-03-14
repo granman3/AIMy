@@ -1,17 +1,17 @@
-# AIMy - AI Management System
+# AIMy - Pet Store Help Kiosk
 
-A voice AI agent built on Pipecat, powered by Claude, Deepgram, and Cartesia.
+A voice AI kiosk built on Pipecat for a pet store. Shoppers press the ESP32 button, ask for products, add confirmed items to a list, and then scan a QR code for a shopping map.
 
 ## Architecture
 
 ```
-Daily Room → Deepgram STT → Claude claude-opus-4-6 (+ tools) → Cartesia TTS → Daily Room
+ESP32 SmallWebRTC → Deepgram Flux STT → Claude (+ tools) → Deepgram TTS → ESP32
 ```
 
 **Tools available to the agent:**
-- `get_datetime` — current date and time
-- `create_note` — save a note
-- `list_notes` — recall saved notes
+- `find_item` — search the in-store catalog
+- `add_item` — add a confirmed product to the current session list
+- `get_shopping_map` — generate a QR-linked shopping map for the current list
 
 ## Setup
 
@@ -27,8 +27,10 @@ pip install -r requirements.txt
 cp .env.example .env
 # Fill in all values in .env
 
-# 4. Run the agent
-python agent.py
+# 4. Run the kiosk bot
+cd server
+uv sync
+uv run bot.py --transport webrtc --esp32 --host <your-lan-ip>
 ```
 
 ## Environment Variables
@@ -36,20 +38,18 @@ python agent.py
 | Variable | Description |
 |---|---|
 | `ANTHROPIC_API_KEY` | Claude API key |
-| `DAILY_ROOM_URL` | Daily.co room URL (e.g. `https://your-domain.daily.co/room`) |
-| `DAILY_API_TOKEN` | Daily.co API token |
 | `DEEPGRAM_API_KEY` | Deepgram API key (STT) |
-| `CARTESIA_API_KEY` | Cartesia API key (TTS) |
-| `CARTESIA_VOICE_ID` | Cartesia voice ID (optional, has default) |
+| `DEEPGRAM_TTS_VOICE` | Deepgram TTS voice |
+| `KIOSK_PUBLIC_BASE_URL` | Optional public URL encoded into kiosk QR codes |
 
 ## Project Structure
 
 ```
 AIMy/
-├── agent.py          # Pipeline, tools, and agent logic
-├── requirements.txt
-├── .env.example
-└── .gitignore
+├── server/           # SmallWebRTC kiosk bot and local map API
+├── pipecat-esp32/    # ESP32 kiosk firmware
+├── agent.py          # Older Daily-based prototype
+└── README.md
 ```
 
 ## Team
@@ -58,7 +58,7 @@ Add your names here!
 
 ## Imported Pipecat Demo
 
-This repository now also contains the Pipecat ESP32 SmallWebRTC demo that was previously developed in this folder.
+This repository includes the Pipecat ESP32 SmallWebRTC kiosk flow used for the pet-store experience.
 
 ### Added directories
 

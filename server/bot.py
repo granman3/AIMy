@@ -19,36 +19,120 @@ Run the bot using::
     uv run bot.py
 """
 
-
+import os
 import sys
+from typing import Literal
 
-from pipecat.runner.types import RunnerArguments
-from pipecat.transports.base_transport import BaseTransport
-from pipecat.frames.frames import LLMRunFrame
+import pipecat.processors.frameworks.rtvi.models as RTVI
 from dotenv import load_dotenv
-from pipecat.transports.smallwebrtc.connection import SmallWebRTCConnection
-from pipecat.transports.smallwebrtc.transport import SmallWebRTCTransport
-from pipecat.transports.base_transport import TransportParams
+from fastapi import FastAPI
+from loguru import logger
+from pipecat.adapters.schemas.function_schema import FunctionSchema
+from pipecat.adapters.schemas.tools_schema import ToolsSchema
+from pipecat.frames.frames import LLMRunFrame
+from pipecat.pipeline.pipeline import Pipeline
+from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
+from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
     LLMUserAggregatorParams,
 )
-from loguru import logger
 from pipecat.processors.frameworks.rtvi import RTVIObserver, RTVIProcessor
-import os
-from pipecat.services.anthropic.llm import AnthropicLLMService
+from pipecat.runner.types import RunnerArguments, SmallWebRTCRunnerArguments
+from pipecat.services.anthropic.llm import AnthropicLLMService, AnthropicLLMSettings
 from pipecat.services.deepgram.flux.stt import DeepgramFluxSTTService
 from pipecat.services.deepgram.tts import DeepgramTTSService
-from pipecat.runner.types import SmallWebRTCRunnerArguments
-from pipecat.pipeline.pipeline import Pipeline
-from pipecat.pipeline.runner import PipelineRunner
-from pipecat.processors.aggregators.llm_context import LLMContext
+from pipecat.services.llm_service import FunctionCallParams
+from pipecat.transports.base_transport import BaseTransport, TransportParams
+from pipecat.transports.smallwebrtc.connection import SmallWebRTCConnection
+from pipecat.transports.smallwebrtc.transport import SmallWebRTCTransport
 from pipecat.turns.user_turn_strategies import ExternalUserTurnStrategies
+from pydantic import BaseModel
 
-
+from kiosk import (
+    LocalInventoryAdapter,
+    LocalMapService,
+    MapRegistry,
+    SessionState,
+    install_map_routes,
+)
 
 load_dotenv(override=True)
+
+MAP_REGISTRY = MapRegistry()
+
+SYSTEM_PROMPT = """You are AIMy, a voice help kiosk for a pet store.
+Keep every reply brief and conversational because customers are standing at the kiosk.
+You speak out loud, so respond in plain natural speech only.
+Do not use markdown, bullet points, numbered lists, emojis, symbols, or screen-oriented formatting.
+Do not say things like "I am showing a list below" or refer to on-screen text unless you are explicitly talking about the QR code.
+Your job is to help shoppers find products and build a shopping list.
+Always use the available tools for product lookup and shopping-list actions.
+Never invent product availability or locations.
+If find_item returns multiple matches, ask the shopper a short follow-up question and wait.
+Only call add_item after the shopper confirms the product is correct.
+When the shopper says they are done, wants their list, or asks for directions, call get_shopping_map.
+Mention aisle and shelf only when it helps the shopper choose the right item."""
+
+TOOLS = ToolsSchema(
+    [
+        FunctionSchema(
+            name="find_item",
+            description="Search the pet store inventory for the item the shopper wants.",
+            properties={
+                "query": {
+                    "type": "string",
+                    "description": "What the shopper is looking for, in natural language.",
+                }
+            },
+            required=["query"],
+        ),
+        FunctionSchema(
+            name="add_item",
+            description="Add a confirmed item to the current shopper's list.",
+            properties={
+                "item_id": {
+                    "type": "string",
+                    "description": "The item_id returned by find_item for the confirmed product.",
+                },
+                "quantity": {
+                    "type": "integer",
+                    "description": "How many of this item to add. Defaults to 1.",
+                    "minimum": 1,
+                },
+            },
+            required=["item_id"],
+        ),
+        FunctionSchema(
+            name="get_shopping_map",
+            description="Create a QR-ready shopping map for the current session list.",
+            properties={},
+            required=[],
+        ),
+    ]
+)
+
+
+class ShowQRCodeMessage(BaseModel):
+    label: Literal["rtvi-ai"] = RTVI.MESSAGE_LABEL
+    type: Literal["show-qr-code"] = "show-qr-code"
+    data: dict[str, str]
+
+
+class HideQRCodeMessage(BaseModel):
+    label: Literal["rtvi-ai"] = RTVI.MESSAGE_LABEL
+    type: Literal["hide-qr-code"] = "hide-qr-code"
+
+
+def _public_base_url() -> str:
+    configured = os.getenv("KIOSK_PUBLIC_BASE_URL")
+    if configured:
+        return configured.rstrip("/")
+
+    from pipecat.runner import run as runner_run
+
+    return f"http://{runner_run.RUNNER_HOST}:{runner_run.RUNNER_PORT}"
 
 
 def _patch_runner_bind_host() -> None:
@@ -74,9 +158,31 @@ def _patch_runner_bind_host() -> None:
 
     runner_run.uvicorn.run = patched_uvicorn_run
 
+
+def _patch_runner_app_routes() -> None:
+    from pipecat.runner import run as runner_run
+
+    if getattr(runner_run, "_kiosk_routes_patched", False):
+        return
+
+    original_create_server_app = runner_run._create_server_app
+
+    def patched_create_server_app(args) -> FastAPI:
+        app = original_create_server_app(args)
+        install_map_routes(app, MAP_REGISTRY)
+        return app
+
+    runner_run._create_server_app = patched_create_server_app
+    runner_run._kiosk_routes_patched = True
+
+
 async def run_bot(transport: BaseTransport):
     """Main bot logic."""
     logger.info("Starting bot")
+    inventory = LocalInventoryAdapter()
+    map_service = LocalMapService()
+    session = SessionState()
+
     flux_model = os.getenv("DEEPGRAM_STT_MODEL", "flux-general-en")
     if flux_model != "flux-general-en":
         raise ValueError(
@@ -86,73 +192,122 @@ async def run_bot(transport: BaseTransport):
 
     # Speech-to-Text service
     stt = DeepgramFluxSTTService(
-            api_key=os.getenv("DEEPGRAM_API_KEY"),
-            settings=DeepgramFluxSTTService.Settings(
-                model=flux_model
-            ),
-        )
+        api_key=os.getenv("DEEPGRAM_API_KEY"),
+        settings=DeepgramFluxSTTService.Settings(model=flux_model),
+    )
 
     # Text-to-Speech service
     tts = DeepgramTTSService(
-            api_key=os.getenv("DEEPGRAM_API_KEY"),
-            settings=DeepgramTTSService.Settings(
-                voice=os.getenv("DEEPGRAM_TTS_VOICE", "aura-2-helena-en")
-            ),
-        )
-
+        api_key=os.getenv("DEEPGRAM_API_KEY"),
+        sample_rate=int(os.getenv("DEEPGRAM_TTS_SAMPLE_RATE", "16000")),
+        encoding=os.getenv("DEEPGRAM_TTS_ENCODING", "linear16"),
+        settings=DeepgramTTSService.Settings(
+            voice=os.getenv("DEEPGRAM_TTS_VOICE", "aura-2-helena-en")
+        ),
+    )
 
     # LLM service
     llm = AnthropicLLMService(
-            api_key=os.getenv("ANTHROPIC_API_KEY"),
+        api_key=os.getenv("ANTHROPIC_API_KEY"),
+        settings=AnthropicLLMSettings(
             model=os.getenv("ANTHROPIC_MODEL", "claude-3-5-haiku-latest")
+        ),
+    )
+
+    rtvi = RTVIProcessor()
+
+    async def handle_find_item(params: FunctionCallParams) -> None:
+        query = str(params.arguments.get("query", "")).strip()
+        matches = inventory.find_item(query)
+        payload = {
+            "status": "ok" if matches else "not_found",
+            "query": query,
+            "matches": [item.to_public_dict() for item in matches],
+        }
+        if not matches:
+            payload["message"] = f"No close matches found for '{query}'."
+        await params.result_callback(payload)
+
+    async def handle_add_item(params: FunctionCallParams) -> None:
+        item_id = str(params.arguments.get("item_id", "")).strip()
+        quantity = int(params.arguments.get("quantity", 1) or 1)
+        if quantity < 1:
+            quantity = 1
+
+        item = inventory.get_item(item_id)
+        if not item:
+            await params.result_callback(
+                {
+                    "status": "error",
+                    "message": f"Unknown item_id '{item_id}'. Use item_id values returned by find_item.",
+                }
+            )
+            return
+
+        entry = session.add_item(item, quantity=quantity)
+        await params.result_callback(
+            {
+                "status": "ok",
+                "added_item": entry.to_public_dict(),
+                "list_count": session.item_count(),
+                "list_items": [saved.to_public_dict() for saved in session.list_items()],
+            }
         )
 
+    async def handle_get_shopping_map(params: FunctionCallParams) -> None:
+        entries = session.list_items()
+        if not entries:
+            await params.result_callback(
+                {
+                    "status": "empty",
+                    "message": "The shopping list is empty. Add at least one item before generating a map.",
+                }
+            )
+            return
 
+        record = MAP_REGISTRY.create(entries, map_service)
+        map_url = f"{_public_base_url()}/maps/{record.token}"
+        await rtvi.push_transport_message(ShowQRCodeMessage(data={"url": map_url}))
+        await params.result_callback(
+            {
+                "status": "ok",
+                "map_url": map_url,
+                "qr_url": map_url,
+                "summary": record.summary,
+                "items": record.items,
+            }
+        )
+
+    llm.register_function("find_item", handle_find_item)
+    llm.register_function("add_item", handle_add_item)
+    llm.register_function("get_shopping_map", handle_get_shopping_map)
 
     messages = [
         {
             "role": "system",
-            "content": "You are a friendly AI assistant. Respond naturally and keep your answers conversational.",
+            "content": SYSTEM_PROMPT,
         },
     ]
 
-    context = LLMContext(messages)
+    context = LLMContext(messages, tools=TOOLS)
     context_aggregator = LLMContextAggregatorPair(
         context,
-        user_params=LLMUserAggregatorParams(
-            user_turn_strategies=ExternalUserTurnStrategies()
-        ),
+        user_params=LLMUserAggregatorParams(user_turn_strategies=ExternalUserTurnStrategies()),
     )
 
-
-    
-
-    rtvi = RTVIProcessor()
-
-
     # Pipeline - assembled from reusable components
-    pipeline = Pipeline([
-        transport.input(),
-
-        rtvi,
-
-        stt,
-
-        
-        context_aggregator.user(),
-
-        llm,
-
-        tts,
-
-        
-        transport.output(),
-
-        
-        
-        context_aggregator.assistant(),
-
-    ])
+    pipeline = Pipeline(
+        [
+            transport.input(),
+            rtvi,
+            stt,
+            context_aggregator.user(),
+            llm,
+            tts,
+            transport.output(),
+            context_aggregator.assistant(),
+        ]
+    )
 
 
     task = PipelineTask(
@@ -168,6 +323,7 @@ async def run_bot(transport: BaseTransport):
 
     @rtvi.event_handler("on_client_ready")
     async def on_client_ready(rtvi):
+        await rtvi.push_transport_message(HideQRCodeMessage())
         await rtvi.set_bot_ready()
         # Kick off the conversation
         await task.queue_frames([LLMRunFrame()])
@@ -180,9 +336,6 @@ async def run_bot(transport: BaseTransport):
     async def on_client_disconnected(transport, client):
         logger.info("Client disconnected")
         await task.cancel()
-
-
-
 
     runner = PipelineRunner(handle_sigint=False)
 
@@ -223,4 +376,5 @@ if __name__ == "__main__":
     from pipecat.runner.run import main
 
     _patch_runner_bind_host()
+    _patch_runner_app_routes()
     main()
