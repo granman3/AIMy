@@ -71,9 +71,23 @@ export interface ToolCallInfo {
   result: unknown;
 }
 
+export interface ShoppingListItem {
+  productId: string;
+  product: Product;
+  quantity: number;
+  addedAt: string;
+}
+
+export interface ShoppingListState {
+  items: ShoppingListItem[];
+  petContext?: string;
+}
+
 export interface Session {
   id: string;
   messages: ChatMessage[];
   plan?: ShoppingPlan;
+  shoppingList: ShoppingListState;
   createdAt: string;
+  lastAccessedAt?: string;
 }

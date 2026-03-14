@@ -14,8 +14,17 @@ interface Message {
   toolCalls?: ToolCallInfo[];
 }
 
+const IDLE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+
+function getGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
 export default function KioskPage() {
-  const [sessionId] = useState(() => uuidv4());
+  const [sessionId, setSessionId] = useState(() => uuidv4());
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [planId, setPlanId] = useState<string | null>(null);
@@ -24,6 +33,7 @@ export default function KioskPage() {
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<ReturnType<typeof createSpeechRecognition>>(null);
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
 
   // Check for speech recognition support
   useEffect(() => {
@@ -38,12 +48,35 @@ export default function KioskPage() {
   // Auto-scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isLoading]);
+  }, [messages, isLoading, planId]);
+
+  // Idle timer — auto-reset after 5 min of inactivity
+  const resetIdleTimer = useCallback(() => {
+    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    idleTimerRef.current = setTimeout(() => {
+      if (messages.length > 0) {
+        stopSpeaking();
+        setMessages([]);
+        setPlanId(null);
+        setIsLoading(false);
+        setIsListening(false);
+        setSessionId(uuidv4());
+      }
+    }, IDLE_TIMEOUT_MS);
+  }, [messages.length]);
+
+  useEffect(() => {
+    resetIdleTimer();
+    return () => {
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    };
+  }, [messages, resetIdleTimer]);
 
   const sendMessage = useCallback(async (text: string) => {
     if (!text.trim() || isLoading) return;
 
     stopSpeaking();
+    resetIdleTimer();
 
     const userMsg: Message = { role: 'user', content: text };
     setMessages(prev => [...prev, userMsg]);
@@ -88,7 +121,7 @@ export default function KioskPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [isLoading, sessionId, voiceEnabled]);
+  }, [isLoading, sessionId, voiceEnabled, resetIdleTimer]);
 
   const toggleMic = useCallback(() => {
     if (isListening) {
@@ -113,17 +146,18 @@ export default function KioskPage() {
     }
   }, [isListening, sendMessage]);
 
+  // Smooth reset — no page reload
   const handleReset = () => {
     stopSpeaking();
     setMessages([]);
     setPlanId(null);
     setIsLoading(false);
     setIsListening(false);
-    window.location.reload();
+    setSessionId(uuidv4());
   };
 
   const planUrl = planId
-    ? `${process.env.NEXT_PUBLIC_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : '')}/plan/${sessionId}`
+    ? `${process.env.NEXT_PUBLIC_URL || (typeof window !== 'undefined' ? window.location.origin : '')}/plan/${sessionId}`
     : null;
 
   return (
@@ -138,7 +172,7 @@ export default function KioskPage() {
             <h1 className="text-lg font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
               AIMy
             </h1>
-            <p className="text-[10px] text-gray-500 uppercase tracking-wider">
+            <p className="text-[11px] text-gray-500 uppercase tracking-wider">
               Paws & Claws Pet Emporium
             </p>
           </div>
@@ -163,10 +197,10 @@ export default function KioskPage() {
             )}
           </button>
 
-          {/* Reset button */}
+          {/* Reset button — larger, more visible */}
           <button
             onClick={handleReset}
-            className="text-xs px-3 py-1.5 rounded-lg bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
+            className="text-sm px-4 py-2 rounded-lg bg-gray-800 text-gray-300 active:bg-gray-600 border border-gray-700 transition-colors"
           >
             New Chat
           </button>
@@ -174,45 +208,53 @@ export default function KioskPage() {
       </header>
 
       {/* Chat area */}
-      <main className="flex-1 overflow-y-auto px-4 py-6 max-w-2xl w-full mx-auto">
+      <main className="flex-1 overflow-y-auto px-4 py-6 max-w-2xl w-full mx-auto" aria-live="polite">
         {/* Welcome message */}
         {messages.length === 0 && (
-          <div className="text-center py-16">
+          <div className="text-center py-12">
             <div className="text-6xl mb-4">🐾</div>
-            <h2 className="text-2xl font-bold mb-2">
-              Hi, I&apos;m{' '}
+            <h2 className="text-3xl font-bold mb-2">
+              {getGreeting()}! I&apos;m{' '}
               <span className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
                 AIMy
               </span>
-              !
             </h2>
-            <p className="text-gray-400 mb-8 max-w-sm mx-auto">
-              Your AI shopping assistant at Paws & Claws. Tell me what you need and I&apos;ll create a personalized shopping plan for you!
+            <p className="text-lg text-gray-400 mb-6 max-w-md mx-auto">
+              Your AI shopping assistant. Tell me what you need and I&apos;ll build a personalized plan!
             </p>
 
+            {/* Mic prompt — prominent */}
+            {hasMic && (
+              <div className="flex items-center justify-center gap-3 mb-8 text-purple-300">
+                <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center">
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
+                    <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
+                  </svg>
+                </div>
+                <span className="text-base font-medium">Tap the mic and tell me what you need</span>
+              </div>
+            )}
+
             {/* Quick suggestions */}
-            <div className="flex flex-wrap gap-2 justify-center max-w-lg mx-auto">
+            <p className="text-sm text-gray-500 mb-3">Or try one of these:</p>
+            <div className="flex flex-wrap gap-2 justify-center max-w-xl mx-auto">
               {[
-                'I just got a goldfish for my kid. What do I need?',
-                'I need food for my betta fish',
-                'I want a tropical fish tank under $75',
-                'My cat needs a new scratching post',
+                'I just got a goldfish - what do I need?',
+                'My betta fish might have fin rot',
+                'Tropical fish tank under $75',
+                'I need supplies for a new puppy',
+                'My cat needs a scratching post',
               ].map((suggestion) => (
                 <button
                   key={suggestion}
                   onClick={() => sendMessage(suggestion)}
-                  className="text-sm px-4 py-2 rounded-full bg-gray-800 text-gray-300 hover:bg-purple-500/20 hover:text-purple-300 border border-gray-700 hover:border-purple-500/30 transition-all"
+                  className="text-base px-5 py-3 rounded-full bg-gray-800 text-gray-300 active:bg-purple-500/30 active:text-purple-200 border border-gray-700 active:border-purple-500/30 transition-all"
                 >
                   {suggestion}
                 </button>
               ))}
             </div>
-
-            {hasMic && (
-              <p className="text-gray-600 text-sm mt-8">
-                Or press the mic button to speak
-              </p>
-            )}
           </div>
         )}
 

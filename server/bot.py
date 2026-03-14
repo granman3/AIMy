@@ -23,6 +23,7 @@ import os
 import sys
 from typing import Literal
 
+import httpx
 import pipecat.processors.frameworks.rtvi.models as RTVI
 from dotenv import load_dotenv
 from fastapi import FastAPI
@@ -62,6 +63,9 @@ load_dotenv(override=True)
 
 MAP_REGISTRY = MapRegistry()
 
+# URL of the Next.js backend (single source of truth for business logic)
+NEXTJS_URL = os.getenv("NEXTJS_URL", "http://localhost:3000")
+
 SYSTEM_PROMPT = """You are AIMy, a voice help kiosk for a pet store.
 Keep every reply brief and conversational because customers are standing at the kiosk.
 You speak out loud, so respond in plain natural speech only.
@@ -70,15 +74,15 @@ Do not say things like "I am showing a list below" or refer to on-screen text un
 Your job is to help shoppers find products and build a shopping list.
 Always use the available tools for product lookup and shopping-list actions.
 Never invent product availability or locations.
-If find_item returns multiple matches, ask the shopper a short follow-up question and wait.
+If find_items returns multiple matches, ask the shopper a short follow-up question and wait.
 Only call add_item after the shopper confirms the product is correct.
-When the shopper says they are done, wants their list, or asks for directions, call get_shopping_map.
+When the shopper says they are done, wants their list, or asks for directions, call generate_plan.
 Mention aisle and shelf only when it helps the shopper choose the right item."""
 
 TOOLS = ToolsSchema(
     [
         FunctionSchema(
-            name="find_item",
+            name="find_items",
             description="Search the pet store inventory for the item the shopper wants.",
             properties={
                 "query": {
@@ -90,11 +94,11 @@ TOOLS = ToolsSchema(
         ),
         FunctionSchema(
             name="add_item",
-            description="Add a confirmed item to the current shopper's list.",
+            description="Add a confirmed item to the current shopper's list. Auto-checks compatibility.",
             properties={
                 "item_id": {
                     "type": "string",
-                    "description": "The item_id returned by find_item for the confirmed product.",
+                    "description": "The item_id returned by find_items for the confirmed product.",
                 },
                 "quantity": {
                     "type": "integer",
@@ -105,10 +109,39 @@ TOOLS = ToolsSchema(
             required=["item_id"],
         ),
         FunctionSchema(
-            name="get_shopping_map",
-            description="Create a QR-ready shopping map for the current session list.",
-            properties={},
-            required=[],
+            name="remove_item",
+            description="Remove an item from the current shopper's list.",
+            properties={
+                "item_id": {
+                    "type": "string",
+                    "description": "The item_id to remove from the shopping list.",
+                },
+            },
+            required=["item_id"],
+        ),
+        FunctionSchema(
+            name="generate_plan",
+            description="Create a QR-ready shopping plan with store route for the current session list.",
+            properties={
+                "title": {
+                    "type": "string",
+                    "description": "A friendly title for the shopping plan.",
+                },
+                "summary": {
+                    "type": "string",
+                    "description": "Brief summary of what was recommended.",
+                },
+                "proTips": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Helpful care tips for the customer.",
+                },
+                "petContext": {
+                    "type": "string",
+                    "description": "Description of the customer's pet situation.",
+                },
+            },
+            required=["title", "summary", "proTips", "petContext"],
         ),
     ]
 )
@@ -176,12 +209,33 @@ def _patch_runner_app_routes() -> None:
     runner_run._kiosk_routes_patched = True
 
 
+# Shared HTTP client for calling Next.js API routes
+_http_client = httpx.Client(base_url=NEXTJS_URL, timeout=15.0)
+
+
+def _call_nextjs_tool(tool_name: str, session_id: str, **kwargs) -> dict:
+    """Call a Next.js tool API endpoint and return the JSON response."""
+    payload = {"sessionId": session_id, **kwargs}
+    resp = _http_client.post(f"/api/tools/{tool_name}", json=payload)
+    resp.raise_for_status()
+    return resp.json()
+
+
 async def run_bot(transport: BaseTransport):
     """Main bot logic."""
     logger.info("Starting bot")
+    # Keep local inventory/map as fallback for legacy map HTML routes
     inventory = LocalInventoryAdapter()
     map_service = LocalMapService()
     session = SessionState()
+
+    # Once Next.js fails for any tool call, stay local for the rest of
+    # the session to avoid split state between the two stores.
+    nextjs_degraded = False
+
+    # Generate a session ID to share state with Next.js
+    import secrets
+    session_id = secrets.token_urlsafe(16)
 
     flux_model = os.getenv("DEEPGRAM_STT_MODEL", "flux-general-en")
     if flux_model != "flux-general-en":
@@ -216,17 +270,76 @@ async def run_bot(transport: BaseTransport):
 
     rtvi = RTVIProcessor()
 
-    async def handle_find_item(params: FunctionCallParams) -> None:
-        query = str(params.arguments.get("query", "")).strip()
+    def _use_local(tool: str, err: Exception | None = None) -> None:
+        """Mark session as degraded so all future calls stay local."""
+        nonlocal nextjs_degraded
+        if not nextjs_degraded:
+            reason = f" ({err})" if err else ""
+            logger.warning(f"Switching to local-only mode for this session{reason}")
+        nextjs_degraded = True
+
+    def _find_items_local(query: str) -> dict:
         matches = inventory.find_item(query)
-        payload = {
+        payload: dict = {
             "status": "ok" if matches else "not_found",
             "query": query,
             "matches": [item.to_public_dict() for item in matches],
         }
         if not matches:
             payload["message"] = f"No close matches found for '{query}'."
-        await params.result_callback(payload)
+        return payload
+
+    def _add_item_local(item_id: str, quantity: int) -> dict:
+        item = inventory.get_item(item_id)
+        if not item:
+            return {
+                "status": "error",
+                "message": f"Unknown item_id '{item_id}'. Use id values returned by find_items.",
+            }
+        entry = session.add_item(item, quantity=quantity)
+        return {
+            "status": "ok",
+            "added_item": entry.to_public_dict(),
+            "list_count": session.item_count(),
+            "list_items": [saved.to_public_dict() for saved in session.list_items()],
+        }
+
+    def _remove_item_local(item_id: str) -> dict:
+        if item_id in session.shopping_list:
+            removed = session.shopping_list.pop(item_id)
+            return {
+                "status": "ok",
+                "removed_item": {"id": item_id, "name": removed.item.name},
+                "list_count": session.item_count(),
+            }
+        return {"status": "error", "message": f"Item '{item_id}' not found in the shopping list."}
+
+    def _generate_plan_local(entries: list) -> dict | None:
+        if not entries:
+            return None
+        record = MAP_REGISTRY.create(entries, map_service)
+        map_url = f"{_public_base_url()}/maps/{record.token}"
+        return {
+            "status": "ok",
+            "map_url": map_url,
+            "qr_url": map_url,
+            "summary": record.summary,
+            "items": record.items,
+        }
+
+    # ---- Tool handlers --------------------------------------------------
+
+    async def handle_find_items(params: FunctionCallParams) -> None:
+        query = str(params.arguments.get("query", "")).strip()
+        if nextjs_degraded:
+            await params.result_callback(_find_items_local(query))
+            return
+        try:
+            result = _call_nextjs_tool("find_items", session_id, query=query)
+            await params.result_callback(result)
+        except Exception as e:
+            _use_local("find_items", e)
+            await params.result_callback(_find_items_local(query))
 
     async def handle_add_item(params: FunctionCallParams) -> None:
         item_id = str(params.arguments.get("item_id", "")).strip()
@@ -234,53 +347,105 @@ async def run_bot(transport: BaseTransport):
         if quantity < 1:
             quantity = 1
 
-        item = inventory.get_item(item_id)
-        if not item:
-            await params.result_callback(
-                {
-                    "status": "error",
-                    "message": f"Unknown item_id '{item_id}'. Use item_id values returned by find_item.",
-                }
+        if nextjs_degraded:
+            await params.result_callback(_add_item_local(item_id, quantity))
+            return
+        try:
+            result = _call_nextjs_tool(
+                "add_item", session_id, item_id=item_id, quantity=quantity
             )
+            # Surface compatibility warnings/suggestions so voice customers hear them
+            extras = []
+            for w in result.get("warnings", []):
+                extras.append(f"Warning: {w}")
+            for s in result.get("suggestions", []):
+                extras.append(f"Suggestion: {s}")
+            if extras:
+                result["voice_notes"] = " ".join(extras)
+            await params.result_callback(result)
+        except Exception as e:
+            _use_local("add_item", e)
+            await params.result_callback(_add_item_local(item_id, quantity))
+
+    async def handle_remove_item(params: FunctionCallParams) -> None:
+        item_id = str(params.arguments.get("item_id", "")).strip()
+        if nextjs_degraded:
+            await params.result_callback(_remove_item_local(item_id))
+            return
+        try:
+            result = _call_nextjs_tool("remove_item", session_id, item_id=item_id)
+            await params.result_callback(result)
+        except Exception as e:
+            _use_local("remove_item", e)
+            await params.result_callback(_remove_item_local(item_id))
+
+    async def handle_generate_plan(params: FunctionCallParams) -> None:
+        nonlocal nextjs_degraded
+        title = str(params.arguments.get("title", "Your Shopping Plan"))
+        summary = str(params.arguments.get("summary", ""))
+        pro_tips = params.arguments.get("proTips", [])
+        pet_context = str(params.arguments.get("petContext", ""))
+
+        if nextjs_degraded:
+            entries = session.list_items()
+            local_result = _generate_plan_local(entries)
+            if not local_result:
+                await params.result_callback(
+                    {"status": "empty", "message": "The shopping list is empty. Add items first."}
+                )
+                return
+            try:
+                await rtvi.push_transport_message(
+                    ShowQRCodeMessage(data={"url": local_result["map_url"]})
+                )
+            except Exception as qr_err:
+                logger.warning(f"Failed to push QR message: {qr_err}")
+            await params.result_callback(local_result)
             return
 
-        entry = session.add_item(item, quantity=quantity)
-        await params.result_callback(
-            {
-                "status": "ok",
-                "added_item": entry.to_public_dict(),
-                "list_count": session.item_count(),
-                "list_items": [saved.to_public_dict() for saved in session.list_items()],
-            }
-        )
-
-    async def handle_get_shopping_map(params: FunctionCallParams) -> None:
-        entries = session.list_items()
-        if not entries:
-            await params.result_callback(
-                {
-                    "status": "empty",
-                    "message": "The shopping list is empty. Add at least one item before generating a map.",
-                }
+        try:
+            result = _call_nextjs_tool(
+                "generate_plan",
+                session_id,
+                title=title,
+                summary=summary,
+                proTips=pro_tips,
+                petContext=pet_context,
             )
-            return
+            if result.get("status") == "ok":
+                # Build the plan URL pointing to Next.js plan page
+                public_url = os.getenv("NEXT_PUBLIC_URL") or os.getenv("NEXTJS_PUBLIC_URL") or NEXTJS_URL
+                map_url = f"{public_url.rstrip('/')}/plan/{session_id}"
+                try:
+                    await rtvi.push_transport_message(
+                        ShowQRCodeMessage(data={"url": map_url})
+                    )
+                except Exception as qr_err:
+                    logger.warning(f"Failed to push QR message: {qr_err}")
+                result["map_url"] = map_url
+                result["qr_url"] = map_url
+            await params.result_callback(result)
+        except Exception as e:
+            _use_local("generate_plan", e)
+            entries = session.list_items()
+            local_result = _generate_plan_local(entries)
+            if not local_result:
+                await params.result_callback(
+                    {"status": "empty", "message": "The shopping list is empty. Add items first."}
+                )
+                return
+            try:
+                await rtvi.push_transport_message(
+                    ShowQRCodeMessage(data={"url": local_result["map_url"]})
+                )
+            except Exception as qr_err:
+                logger.warning(f"Failed to push QR message: {qr_err}")
+            await params.result_callback(local_result)
 
-        record = MAP_REGISTRY.create(entries, map_service)
-        map_url = f"{_public_base_url()}/maps/{record.token}"
-        await rtvi.push_transport_message(ShowQRCodeMessage(data={"url": map_url}))
-        await params.result_callback(
-            {
-                "status": "ok",
-                "map_url": map_url,
-                "qr_url": map_url,
-                "summary": record.summary,
-                "items": record.items,
-            }
-        )
-
-    llm.register_function("find_item", handle_find_item)
+    llm.register_function("find_items", handle_find_items)
     llm.register_function("add_item", handle_add_item)
-    llm.register_function("get_shopping_map", handle_get_shopping_map)
+    llm.register_function("remove_item", handle_remove_item)
+    llm.register_function("generate_plan", handle_generate_plan)
 
     messages = [
         {

@@ -10,8 +10,12 @@ interface QRCodeDisplayProps {
 export default function QRCodeDisplay({ planUrl }: QRCodeDisplayProps) {
   const [artisticQR, setArtisticQR] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [visible, setVisible] = useState(false);
 
   useEffect(() => {
+    // Trigger entrance animation
+    const timer = setTimeout(() => setVisible(true), 50);
+
     const generateArtisticQR = async () => {
       try {
         const res = await fetch('/api/qr', {
@@ -24,7 +28,7 @@ export default function QRCodeDisplay({ planUrl }: QRCodeDisplayProps) {
           setArtisticQR(data.image);
         }
       } catch {
-        // Artistic QR failed, standard QR stays
+        // Standard QR stays
       } finally {
         setLoading(false);
       }
@@ -33,33 +37,46 @@ export default function QRCodeDisplay({ planUrl }: QRCodeDisplayProps) {
     const timeout = setTimeout(() => setLoading(false), 30000);
     generateArtisticQR();
 
-    return () => clearTimeout(timeout);
+    return () => {
+      clearTimeout(timeout);
+      clearTimeout(timer);
+    };
   }, [planUrl]);
 
   return (
-    <div className="flex flex-col items-center gap-4 p-6 bg-gray-800/50 rounded-2xl border border-gray-700">
-      <h3 className="text-lg font-semibold text-white">Your Shopping Plan is Ready!</h3>
-      <p className="text-sm text-gray-400 text-center">
-        Scan with your phone to take your plan with you
-      </p>
+    <div
+      className={`flex flex-col items-center gap-4 p-6 bg-gradient-to-b from-purple-900/30 to-gray-800/50 rounded-2xl border border-purple-500/30 transition-all duration-700 ${
+        visible ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 translate-y-4'
+      }`}
+    >
+      {/* Celebration header */}
+      <div className="text-center">
+        <p className="text-3xl mb-2">🎉</p>
+        <h3 className="text-xl font-bold text-white">Your Shopping Plan is Ready!</h3>
+        <p className="text-base text-gray-300 mt-1">
+          Scan with your phone to take it with you
+        </p>
+      </div>
 
-      {/* QR code — always scannable, no overlay */}
-      <div className="bg-white p-4 rounded-xl shadow-lg">
+      {/* QR code — always scannable */}
+      <div className={`bg-white p-5 rounded-xl shadow-lg shadow-purple-500/20 transition-all duration-500 ${
+        visible ? 'scale-100' : 'scale-90'
+      }`}>
         {artisticQR ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={artisticQR}
             alt="QR Code to shopping plan"
-            className="w-48 h-48 object-contain"
+            className="w-56 h-56 object-contain"
           />
         ) : (
-          <QRCode value={planUrl} size={192} level="M" />
+          <QRCode value={planUrl} size={224} level="M" />
         )}
       </div>
 
-      {/* Non-blocking status text below the QR */}
+      {/* Non-blocking status text */}
       {loading && !artisticQR && (
-        <div className="flex items-center gap-2 text-[11px] text-gray-500">
+        <div className="flex items-center gap-2 text-xs text-gray-500">
           <div className="w-3 h-3 border border-purple-500 border-t-transparent rounded-full animate-spin" />
           Generating artistic QR...
         </div>
@@ -69,9 +86,9 @@ export default function QRCodeDisplay({ planUrl }: QRCodeDisplayProps) {
         href={planUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-xs text-purple-400 hover:text-purple-300 underline"
+        className="text-sm text-purple-400 hover:text-purple-300 active:text-purple-200 underline"
       >
-        Or click here to open your plan
+        Or tap here to open your plan
       </a>
     </div>
   );
