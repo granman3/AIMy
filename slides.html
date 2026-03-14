@@ -1,0 +1,1182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AIMy — AI Management Assistant</title>
+  <style>
+    /* ─── Reset & Base ─────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #050810;
+      --surface:   #0d1220;
+      --card:      #111827;
+      --border:    rgba(99,179,237,0.18);
+      --accent1:   #63b3ed;   /* sky blue  */
+      --accent2:   #9f7aea;   /* violet    */
+      --accent3:   #48bb78;   /* emerald   */
+      --accent4:   #f6ad55;   /* amber     */
+      --text:      #e2e8f0;
+      --muted:     #718096;
+      --white:     #ffffff;
+      --grad-hero: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      --grad-blue: linear-gradient(135deg, #1e3a5f, #0d1220);
+      --grad-violet: linear-gradient(135deg, #2d1b69, #0d1220);
+      --grad-green: linear-gradient(135deg, #1a3a2a, #0d1220);
+    }
+
+    html, body {
+      width: 100%; height: 100%;
+      background: var(--bg);
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      color: var(--text);
+      overflow: hidden;
+    }
+
+    /* ─── Deck container ────────────────────────────────────────── */
+    .deck {
+      width: 100vw; height: 100vh;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* ─── Slides ───────────────────────────────────────────────── */
+    .slide {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 60px 80px;
+      opacity: 0;
+      transform: translateX(60px);
+      transition: opacity 0.55s cubic-bezier(.4,0,.2,1),
+                  transform 0.55s cubic-bezier(.4,0,.2,1);
+      pointer-events: none;
+    }
+    .slide.active {
+      opacity: 1;
+      transform: translateX(0);
+      pointer-events: all;
+    }
+    .slide.exit {
+      opacity: 0;
+      transform: translateX(-60px);
+    }
+
+    /* ─── Background variants ──────────────────────────────────── */
+    .slide-hero    { background: var(--grad-hero); }
+    .slide-dark    { background: var(--bg); }
+    .slide-blue    { background: var(--grad-blue); }
+    .slide-violet  { background: var(--grad-violet); }
+    .slide-green   { background: var(--grad-green); }
+
+    /* ─── Animated mesh background ────────────────────────────── */
+    .mesh {
+      position: absolute; inset: 0;
+      overflow: hidden;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .mesh::before, .mesh::after {
+      content: '';
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(80px);
+      opacity: 0.15;
+      animation: drift 12s ease-in-out infinite alternate;
+    }
+    .mesh::before {
+      width: 600px; height: 600px;
+      background: radial-gradient(circle, var(--accent1), transparent 70%);
+      top: -200px; left: -200px;
+    }
+    .mesh::after {
+      width: 500px; height: 500px;
+      background: radial-gradient(circle, var(--accent2), transparent 70%);
+      bottom: -150px; right: -150px;
+      animation-delay: -6s;
+    }
+    @keyframes drift {
+      from { transform: translate(0,0) scale(1); }
+      to   { transform: translate(60px,40px) scale(1.1); }
+    }
+
+    .content { position: relative; z-index: 1; width: 100%; max-width: 1100px; }
+
+    /* ─── Typography ───────────────────────────────────────────── */
+    .eyebrow {
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: var(--accent1);
+      margin-bottom: 20px;
+    }
+    h1 {
+      font-size: clamp(3rem, 6vw, 5.5rem);
+      font-weight: 800;
+      line-height: 1.05;
+      letter-spacing: -0.02em;
+    }
+    h2 {
+      font-size: clamp(2rem, 4vw, 3.2rem);
+      font-weight: 700;
+      line-height: 1.15;
+      letter-spacing: -0.015em;
+      margin-bottom: 12px;
+    }
+    h3 {
+      font-size: 1.2rem;
+      font-weight: 600;
+      color: var(--accent1);
+      margin-bottom: 8px;
+    }
+    .subtitle {
+      font-size: clamp(1.1rem, 2vw, 1.5rem);
+      color: var(--muted);
+      font-weight: 400;
+      margin-top: 16px;
+      line-height: 1.6;
+    }
+    p {
+      font-size: 1.05rem;
+      line-height: 1.75;
+      color: #a0aec0;
+    }
+
+    /* ─── Gradient text ────────────────────────────────────────── */
+    .grad-text {
+      background: linear-gradient(90deg, var(--accent1) 0%, var(--accent2) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .grad-text-green {
+      background: linear-gradient(90deg, var(--accent3) 0%, var(--accent1) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    /* ─── Badge / chip ─────────────────────────────────────────── */
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 14px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--accent1);
+      background: rgba(99,179,237,0.07);
+      letter-spacing: 0.04em;
+    }
+    .chip.violet {
+      color: var(--accent2);
+      background: rgba(159,122,234,0.07);
+      border-color: rgba(159,122,234,0.25);
+    }
+    .chip.green {
+      color: var(--accent3);
+      background: rgba(72,187,120,0.07);
+      border-color: rgba(72,187,120,0.25);
+    }
+    .chip.amber {
+      color: var(--accent4);
+      background: rgba(246,173,85,0.07);
+      border-color: rgba(246,173,85,0.25);
+    }
+    .chip-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 30px; }
+
+    /* ─── Cards ────────────────────────────────────────────────── */
+    .cards {
+      display: grid;
+      gap: 20px;
+      margin-top: 36px;
+    }
+    .cards-2 { grid-template-columns: 1fr 1fr; }
+    .cards-3 { grid-template-columns: 1fr 1fr 1fr; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px 30px;
+      transition: border-color 0.3s, transform 0.3s;
+    }
+    .card:hover {
+      border-color: rgba(99,179,237,0.45);
+      transform: translateY(-3px);
+    }
+    .card-icon {
+      font-size: 2rem;
+      margin-bottom: 14px;
+    }
+    .card p { font-size: 0.95rem; }
+
+    /* ─── Pipeline diagram ─────────────────────────────────────── */
+    .pipeline {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      margin-top: 40px;
+      width: 100%;
+      justify-content: center;
+    }
+    .pipe-step {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      flex: 1;
+    }
+    .pipe-box {
+      width: 100%;
+      max-width: 150px;
+      padding: 16px 10px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      text-align: center;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text);
+      position: relative;
+    }
+    .pipe-box .pipe-icon { font-size: 1.6rem; display: block; margin-bottom: 6px; }
+    .pipe-arrow {
+      font-size: 1.4rem;
+      color: var(--accent1);
+      opacity: 0.6;
+      flex-shrink: 0;
+      padding: 0 4px;
+    }
+    .pipe-label {
+      font-size: 0.7rem;
+      color: var(--muted);
+      text-align: center;
+      max-width: 120px;
+    }
+    .pipe-box.highlight {
+      border-color: var(--accent2);
+      background: linear-gradient(135deg, rgba(159,122,234,0.12), var(--card));
+      box-shadow: 0 0 20px rgba(159,122,234,0.18);
+    }
+    .pipe-box.highlight2 {
+      border-color: var(--accent1);
+      background: linear-gradient(135deg, rgba(99,179,237,0.12), var(--card));
+      box-shadow: 0 0 20px rgba(99,179,237,0.18);
+    }
+
+    /* ─── Big stat ─────────────────────────────────────────────── */
+    .stats { display: flex; gap: 40px; margin-top: 40px; }
+    .stat {
+      text-align: center;
+      flex: 1;
+      padding: 30px 20px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+    }
+    .stat-num {
+      font-size: 3rem;
+      font-weight: 800;
+      line-height: 1;
+    }
+    .stat-label {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-top: 8px;
+      font-weight: 500;
+    }
+
+    /* ─── Code block ───────────────────────────────────────────── */
+    .code-block {
+      background: #0a0e1a;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px 28px;
+      margin-top: 28px;
+      font-family: 'Cascadia Code', 'Fira Code', 'Menlo', monospace;
+      font-size: 0.88rem;
+      line-height: 1.7;
+      color: #a0aec0;
+      overflow: hidden;
+    }
+    .code-block .kw  { color: #9f7aea; }
+    .code-block .fn  { color: #63b3ed; }
+    .code-block .str { color: #48bb78; }
+    .code-block .cm  { color: #4a5568; font-style: italic; }
+    .code-block .var { color: #f6ad55; }
+
+    /* ─── List ─────────────────────────────────────────────────── */
+    .feat-list { list-style: none; margin-top: 30px; display: flex; flex-direction: column; gap: 16px; }
+    .feat-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      font-size: 1.05rem;
+      color: #cbd5e0;
+    }
+    .feat-list .bullet {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--accent1);
+      flex-shrink: 0;
+      margin-top: 8px;
+    }
+    .feat-list .bullet.v { background: var(--accent2); }
+    .feat-list .bullet.g { background: var(--accent3); }
+    .feat-list .bullet.a { background: var(--accent4); }
+
+    /* ─── Stack grid ───────────────────────────────────────────── */
+    .stack-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-top: 36px;
+    }
+    .stack-item {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px 16px;
+      text-align: center;
+    }
+    .stack-item .stack-icon { font-size: 2rem; margin-bottom: 10px; }
+    .stack-item .stack-name { font-size: 0.9rem; font-weight: 700; color: var(--text); }
+    .stack-item .stack-desc { font-size: 0.75rem; color: var(--muted); margin-top: 4px; }
+
+    /* ─── Quote / callout ──────────────────────────────────────── */
+    .callout {
+      border-left: 3px solid var(--accent2);
+      padding: 18px 24px;
+      background: rgba(159,122,234,0.07);
+      border-radius: 0 12px 12px 0;
+      margin-top: 28px;
+      font-size: 1.05rem;
+      font-style: italic;
+      color: #c9b8f5;
+      line-height: 1.65;
+    }
+
+    /* ─── Hero logo / wordmark ─────────────────────────────────── */
+    .wordmark {
+      font-size: clamp(4rem, 10vw, 8rem);
+      font-weight: 900;
+      letter-spacing: -0.04em;
+      line-height: 1;
+    }
+    .wordmark .ai { color: var(--accent1); }
+    .wordmark .my {
+      background: linear-gradient(90deg, var(--accent2), var(--accent1));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    /* ─── Pulse dot ────────────────────────────────────────────── */
+    .pulse-dot {
+      display: inline-block;
+      width: 10px; height: 10px;
+      background: var(--accent3);
+      border-radius: 50%;
+      box-shadow: 0 0 0 0 rgba(72,187,120,0.5);
+      animation: pulse-anim 2s ease-in-out infinite;
+    }
+    @keyframes pulse-anim {
+      0%   { box-shadow: 0 0 0 0 rgba(72,187,120,0.5); }
+      70%  { box-shadow: 0 0 0 10px rgba(72,187,120,0); }
+      100% { box-shadow: 0 0 0 0 rgba(72,187,120,0); }
+    }
+
+    /* ─── Waveform decoration ──────────────────────────────────── */
+    .waveform {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      height: 48px;
+      margin-top: 28px;
+    }
+    .wave-bar {
+      width: 4px;
+      border-radius: 2px;
+      background: var(--accent1);
+      animation: wave-anim 1.2s ease-in-out infinite;
+      opacity: 0.7;
+    }
+    .wave-bar:nth-child(2n)   { background: var(--accent2); }
+    .wave-bar:nth-child(3n)   { background: var(--accent3); }
+    @keyframes wave-anim {
+      0%,100% { height: 8px; }
+      50%     { height: 40px; }
+    }
+
+    /* ─── Navigation ───────────────────────────────────────────── */
+    .nav {
+      position: fixed;
+      bottom: 36px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      background: rgba(13,18,32,0.85);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 10px 20px;
+      z-index: 100;
+    }
+    .nav-btn {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      background: rgba(99,179,237,0.08);
+      color: var(--accent1);
+      font-size: 1rem;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.2s, transform 0.2s;
+    }
+    .nav-btn:hover { background: rgba(99,179,237,0.2); transform: scale(1.1); }
+    .nav-counter {
+      font-size: 0.82rem;
+      color: var(--muted);
+      min-width: 52px;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+    }
+    .nav-dots { display: flex; gap: 6px; }
+    .nav-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--muted);
+      cursor: pointer;
+      transition: background 0.2s, transform 0.2s;
+    }
+    .nav-dot.active { background: var(--accent1); transform: scale(1.4); }
+
+    /* ─── Progress bar ─────────────────────────────────────────── */
+    .progress {
+      position: fixed;
+      top: 0; left: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--accent1), var(--accent2));
+      transition: width 0.4s ease;
+      z-index: 100;
+      border-radius: 0 2px 2px 0;
+    }
+
+    /* ─── Slide number ─────────────────────────────────────────── */
+    .slide-num {
+      position: fixed;
+      top: 20px; right: 28px;
+      font-size: 0.75rem;
+      color: var(--muted);
+      z-index: 100;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* ─── CTA slide ────────────────────────────────────────────── */
+    .cta-box {
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 40px 50px;
+      background: linear-gradient(135deg, rgba(99,179,237,0.06), rgba(159,122,234,0.06));
+      text-align: center;
+      margin-top: 36px;
+    }
+    .cta-cmd {
+      font-family: 'Cascadia Code', 'Fira Code', monospace;
+      font-size: 1.1rem;
+      color: var(--accent3);
+      background: rgba(0,0,0,0.3);
+      border-radius: 8px;
+      padding: 10px 24px;
+      display: inline-block;
+      margin-top: 16px;
+    }
+
+    /* ─── Two-col layout ───────────────────────────────────────── */
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 50px;
+      align-items: start;
+      margin-top: 30px;
+    }
+
+    /* ─── Divider ──────────────────────────────────────────────── */
+    .divider {
+      width: 60px; height: 3px;
+      background: linear-gradient(90deg, var(--accent1), var(--accent2));
+      border-radius: 2px;
+      margin: 18px 0;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* keyboard hint */
+    .kbd-hint {
+      position: fixed;
+      bottom: 90px;
+      right: 28px;
+      font-size: 0.7rem;
+      color: var(--muted);
+      opacity: 0.6;
+    }
+  </style>
+</head>
+<body>
+
+<div class="progress" id="progress"></div>
+<div class="slide-num" id="slideNum"></div>
+
+<div class="deck" id="deck">
+
+  <!-- ══════════════════════════════════════════════
+       SLIDE 1 — HERO
+  ══════════════════════════════════════════════ -->
+  <div class="slide slide-hero active" id="s0">
+    <div class="mesh"></div>
+    <div class="content" style="text-align:center;">
+      <div class="wordmark"><span class="ai">AI</span><span class="my">My</span></div>
+      <div class="divider" style="margin:24px auto;"></div>
+      <p class="subtitle" style="font-size:1.4rem;max-width:640px;margin:0 auto;">
+        Your intelligent AI management assistant — <br>
+        <span style="color:var(--accent1);">voice-native</span>, <span style="color:var(--accent2);">real-time</span>, <span style="color:var(--accent3);">Claude-powered</span>
+      </p>
+      <div class="waveform" style="justify-content:center;margin-top:40px;">
+        <div class="wave-bar" style="height:12px;animation-delay:0s"></div>
+        <div class="wave-bar" style="height:28px;animation-delay:0.1s"></div>
+        <div class="wave-bar" style="height:20px;animation-delay:0.2s"></div>
+        <div class="wave-bar" style="height:36px;animation-delay:0.3s"></div>
+        <div class="wave-bar" style="height:24px;animation-delay:0.4s"></div>
+        <div class="wave-bar" style="height:16px;animation-delay:0.5s"></div>
+        <div class="wave-bar" style="height:40px;animation-delay:0.6s"></div>
+        <div class="wave-bar" style="height:20px;animation-delay:0.7s"></div>
+        <div class="wave-bar" style="height:32px;animation-delay:0.8s"></div>
+        <div class="wave-bar" style="height:14px;animation-delay:0.9s"></div>
+        <div class="wave-bar" style="height:28px;animation-delay:1.0s"></div>
+        <div class="wave-bar" style="height:8px;animation-delay:1.1s"></div>
+        <div class="wave-bar" style="height:36px;animation-delay:1.2s"></div>
+        <div class="wave-bar" style="height:22px;animation-delay:1.3s"></div>
+        <div class="wave-bar" style="height:16px;animation-delay:1.4s"></div>
+      </div>
+      <div class="chip-row" style="justify-content:center;margin-top:36px;">
+        <span class="chip">&#127908; Voice-First</span>
+        <span class="chip violet">&#129302; Claude Opus 4.6</span>
+        <span class="chip green">&#9889; Real-Time Pipeline</span>
+        <span class="chip amber">&#128293; Open Source</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════
+       SLIDE 2 — THE PROBLEM
+  ══════════════════════════════════════════════ -->
+  <div class="slide slide-dark" id="s1">
+    <div class="mesh"></div>
+    <div class="content">
+      <p class="eyebrow">The Problem</p>
+      <h2>Managing AI workflows is <span class="grad-text">hard</span></h2>
+      <div class="divider"></div>
+      <div class="cards cards-3" style="margin-top:30px;">
+        <div class="card">
+          <div class="card-icon">&#128145;</div>
+          <h3>Fragmented Interfaces</h3>
+          <p>Dozens of dashboards, CLIs, and GUIs — none of them talk to each other in real time.</p>
+        </div>
+        <div class="card">
+          <div class="card-icon">&#9200;</div>
+          <h3>Slow Feedback Loops</h3>
+          <p>Text-based prompting breaks concentration. You lose context switching between tools.</p>
+        </div>
+        <div class="card">
+          <div class="card-icon">&#129302;</div>
+          <h3>AI Blind Spots</h3>
+          <p>Agents run silently. You don't know what they're doing or how to course-correct in the moment.</p>
+        </div>
+      </div>
+      <div class="callout">
+        "The gap between what AI can do and how well humans can direct it in real time is the defining bottleneck of the AI era."
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════
+       SLIDE 3 — WHAT IS AIMY
+  ══════════════════════════════════════════════ -->
+  <div class="slide slide-blue" id="s2">
+    <div class="mesh"></div>
+    <div class="content">
+      <p class="eyebrow">The Solution</p>
+      <h2>Meet <span class="grad-text">AIMy</span></h2>
+      <div class="divider"></div>
+      <div class="two-col">
+        <div>
+          <p style="font-size:1.1rem;color:#cbd5e0;line-height:1.8;margin-bottom:24px;">
+            AIMy is a <strong style="color:var(--accent1);">voice-native AI management assistant</strong> that lets you coordinate, monitor, and direct AI workflows using natural speech — as naturally as talking to a colleague.
+          </p>
+          <ul class="feat-list">
+            <li><span class="bullet"></span>Speak to your AI systems in real time</li>
+            <li><span class="bullet v"></span>Interrupt and redirect at any moment</li>
+            <li><span class="bullet g"></span>Full conversational context retained</li>
+            <li><span class="bullet a"></span>Zero-friction — no GUI required</li>
+          </ul>
+        </div>
+        <div>
+          <div class="card" style="padding:32px;">
+            <div class="card-icon" style="font-size:3rem;">&#127908;</div>
+            <h3 style="font-size:1.4rem;margin-bottom:12px;">Voice-First by Design</h3>
+            <p>Built around the human voice as the primary interface. Speak naturally — AIMy listens, understands, and acts immediately.</p>
+            <div style="margin-top:24px;display:flex;align-items:center;gap:10px;">
+              <span class="pulse-dot"></span>
+              <span style="font-size:0.85rem;color:var(--accent3);">Always listening, always ready</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════
+       SLIDE 4 — PIPELINE ARCHITECTURE
+  ══════════════════════════════════════════════ -->
+  <div class="slide slide-dark" id="s3">
+    <div class="mesh"></div>
+    <div class="content">
+      <p class="eyebrow">Architecture</p>
+      <h2>Real-time <span class="grad-text">5-stage pipeline</span></h2>
+      <div class="divider"></div>
+      <div class="pipeline">
+        <div class="pipe-step">
+          <div class="pipe-box highlight2">
+            <span class="pipe-icon">&#127908;</span>
+            Audio In
+          </div>
+          <div class="pipe-label">Local mic capture</div>
+        </div>
+        <div class="pipe-arrow">&#8594;</div>
+        <div class="pipe-step">
+          <div class="pipe-box">
+            <span class="pipe-icon">&#128266;</span>
+            VAD
+          </div>
+          <div class="pipe-label">Silero voice detection</div>
+        </div>
+        <div class="pipe-arrow">&#8594;</div>
+        <div class="pipe-step">
+          <div class="pipe-box highlight">
+            <span class="pipe-icon">&#129302;</span>
+            Claude LLM
+          </div>
+          <div class="pipe-label">Opus 4.6 — the brain</div>
+        </div>
+        <div class="pipe-arrow">&#8594;</div>
+        <div class="pipe-step">
+          <div class="pipe-box">
+            <span class="pipe-icon">&#128196;</span>
+            Context
+          </div>
+          <div class="pipe-label">Response aggregation</div>
+        </div>
+        <div class="pipe-arrow">&#8594;</div>
+        <div class="pipe-step">
+          <div class="pipe-box highlight2">
+            <span class="pipe-icon">&#128264;</span>
+            Audio Out
+          </div>
+          <div class="pipe-label">Synthesized speech</div>
+        </div>
+      </div>
+      <div class="cards cards-2" style="margin-top:32px;">
+        <div class="card">
+          <h3>&#9889; Async Non-Blocking</h3>
+          <p>Built on Python asyncio — every stage runs concurrently for minimal latency end-to-end.</p>
+        </div>
+        <div class="card">
+          <h3>&#9996;&#65039; Interruptible Responses</h3>
+          <p>Users can speak mid-response. The pipeline detects the interruption and adapts instantly.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════
+       SLIDE 5 — UNDER THE HOOD (CODE)
+  ══════════════════════════════════════════════ -->
+  <div class="slide slide-violet" id="s4">
+    <div class="mesh"></div>
+    <div class="content">
+      <p class="eyebrow">Under the Hood</p>
+      <h2>Elegant <span class="grad-text">core code</span></h2>
+      <div class="divider"></div>
+      <div class="code-block">
+<span class="cm"># Build the real-time agent pipeline</span>
+pipeline = <span class="fn">Pipeline</span>([
+    transport.<span class="fn">input</span>(),          <span class="cm"># mic → VAD → frames</span>
+    user_context_aggr,       <span class="cm"># aggregate user speech</span>
+    llm,                     <span class="cm"># Claude Opus 4.6</span>
+    assistant_context_aggr,  <span class="cm"># format response</span>
+    transport.<span class="fn">output</span>(),         <span class="cm"># TTS → speakers</span>
+])
+
+task = <span class="fn">PipelineTask</span>(
+    pipeline,
+    <span class="fn">PipelineParams</span>(allow_interruptions=<span class="kw">True</span>)
+)
+
+<span class="kw">await</span> runner.<span class="fn">run</span>(task)  <span class="cm"># 🚀 launch</span>
+      </div>
+      <div class="chip-row" style="margin-top:20px;">
+        <span class="chip">~100 lines total</span>
+        <span class="chip violet">Pipecat framework</span>
+        <span class="chip green">Production-ready scaffold</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════
+       SLIDE 6 — KEY FEATURES
+  ══════════════════════════════════════════════ -->
+  <div class="slide slide-dark" id="s5">
+    <div class="mesh"></div>
+    <div class="content">
+      <p class="eyebrow">Capabilities</p>
+      <h2>What makes AIMy <span class="grad-text-green">powerful</span></h2>
+      <div class="divider"></div>
+      <div class="cards cards-3" style="margin-top:28px;">
+        <div class="card">
+          <div class="card-icon">&#127908;</div>
+          <h3>Voice Activity Detection</h3>
+          <p>Silero VAD automatically detects when you start and stop speaking. No push-to-talk. No magic words.</p>
+        </div>
+        <div class="card">
+          <div class="card-icon">&#129302;</div>
+          <h3>Claude Opus 4.6</h3>
+          <p>The most capable model in the Claude family — deep reasoning, long context, nuanced understanding.</p>
+        </div>
+        <div class="card">
+          <div class="card-icon">&#9994;</div>
+          <h3>Interruptible</h3>
+          <p>Speak up mid-sentence. AIMy stops, listens, and course-corrects. Designed for natural conversation flow.</p>
+        </div>
+        <div class="card">
+          <div class="card-icon">&#128202;</div>
+          <h3>Persistent Context</h3>
+          <p>Full conversation history is maintained across turns. AIMy never forgets what you said earlier.</p>
+        </div>
+        <div class="card">
+          <div class="card-icon">&#127760;</div>
+          <h3>WebRTC Ready</h3>
+          <p>Daily.co transport integration is scaffolded in. Scale to remote, multi-user voice sessions easily.</p>
+        </div>
+        <div class="card">
+          <div class="card-icon">&#9889;</div>
+          <h3>Async Core</h3>
+          <p>Every stage is non-blocking. Python asyncio ensures minimal latency across the full pipeline.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════
+       SLIDE 7 — TECH STACK
+  ══════════════════════════════════════════════ -->
+  <div class="slide slide-blue" id="s6">
+    <div class="mesh"></div>
+    <div class="content">
+      <p class="eyebrow">Technology</p>
+      <h2>World-class <span class="grad-text">tech stack</span></h2>
+      <div class="divider"></div>
+      <div class="stack-grid">
+        <div class="stack-item">
+          <div class="stack-icon">&#129302;</div>
+          <div class="stack-name">Claude Opus 4.6</div>
+          <div class="stack-desc">Anthropic's most capable model</div>
+        </div>
+        <div class="stack-item">
+          <div class="stack-icon">&#128297;</div>
+          <div class="stack-name">Pipecat</div>
+          <div class="stack-desc">Real-time AI agent framework</div>
+        </div>
+        <div class="stack-item">
+          <div class="stack-icon">&#128266;</div>
+          <div class="stack-name">Silero VAD</div>
+          <div class="stack-desc">Neural voice activity detection</div>
+        </div>
+        <div class="stack-item">
+          <div class="stack-icon">&#127760;</div>
+          <div class="stack-name">Daily.co</div>
+          <div class="stack-desc">WebRTC audio infrastructure</div>
+        </div>
+        <div class="stack-item">
+          <div class="stack-icon">&#128013;</div>
+          <div class="stack-name">Python 3</div>
+          <div class="stack-desc">asyncio-native runtime</div>
+        </div>
+        <div class="stack-item">
+          <div class="stack-icon">&#128274;</div>
+          <div class="stack-name">dotenv</div>
+          <div class="stack-desc">Secure key management</div>
+        </div>
+        <div class="stack-item">
+          <div class="stack-icon">&#9889;</div>
+          <div class="stack-name">asyncio</div>
+          <div class="stack-desc">Non-blocking event loop</div>
+        </div>
+        <div class="stack-item">
+          <div class="stack-icon">&#128196;</div>
+          <div class="stack-name">Anthropic SDK</div>
+          <div class="stack-desc">Official Python client</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════
+       SLIDE 8 — HOW IT FEELS
+  ══════════════════════════════════════════════ -->
+  <div class="slide slide-dark" id="s7">
+    <div class="mesh"></div>
+    <div class="content" style="max-width:860px;">
+      <p class="eyebrow">User Experience</p>
+      <h2>It feels like a <span class="grad-text">superpower</span></h2>
+      <div class="divider"></div>
+      <div class="cards cards-2" style="margin-top:28px;">
+        <div class="card" style="border-color:rgba(99,179,237,0.3);">
+          <h3 style="color:var(--muted);font-size:0.8rem;font-weight:500;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:16px;">Without AIMy</h3>
+          <ul class="feat-list">
+            <li><span style="color:#fc8181;font-size:1rem;">✗</span> &nbsp;Switch between 5 different tools</li>
+            <li><span style="color:#fc8181;font-size:1rem;">✗</span> &nbsp;Type out every command manually</li>
+            <li><span style="color:#fc8181;font-size:1rem;">✗</span> &nbsp;Lose flow state constantly</li>
+            <li><span style="color:#fc8181;font-size:1rem;">✗</span> &nbsp;No way to interrupt or redirect</li>
+          </ul>
+        </div>
+        <div class="card" style="border-color:rgba(72,187,120,0.4);background:linear-gradient(135deg,rgba(72,187,120,0.06),var(--card));">
+          <h3 style="color:var(--accent3);font-size:0.8rem;font-weight:500;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:16px;">With AIMy</h3>
+          <ul class="feat-list">
+            <li><span style="color:var(--accent3);font-size:1rem;">✓</span> &nbsp;Just speak — AIMy handles it</li>
+            <li><span style="color:var(--accent3);font-size:1rem;">✓</span> &nbsp;Natural conversation, zero friction</li>
+            <li><span style="color:var(--accent3);font-size:1rem;">✓</span> &nbsp;Full flow state maintained</li>
+            <li><span style="color:var(--accent3);font-size:1rem;">✓</span> &nbsp;Interrupt and redirect instantly</li>
+          </ul>
+        </div>
+      </div>
+      <div class="callout" style="margin-top:28px;">
+        "Talk to your AI the way you'd talk to a smart engineer sitting next to you."
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════
+       SLIDE 9 — SETUP
+  ══════════════════════════════════════════════ -->
+  <div class="slide slide-green" id="s8">
+    <div class="mesh"></div>
+    <div class="content" style="max-width:800px;">
+      <p class="eyebrow">Getting Started</p>
+      <h2>Up in <span class="grad-text-green">60 seconds</span></h2>
+      <div class="divider"></div>
+      <div class="code-block" style="margin-top:28px;">
+<span class="cm"># 1. Clone and enter the project</span>
+<span class="fn">git</span> clone &lt;repo&gt; &amp;&amp; cd AIMy
+
+<span class="cm"># 2. Create a virtual environment</span>
+<span class="fn">python</span> -m venv .venv &amp;&amp; source .venv/bin/activate
+
+<span class="cm"># 3. Install dependencies</span>
+<span class="fn">pip</span> install -r requirements.txt
+
+<span class="cm"># 4. Configure your API key</span>
+<span class="fn">cp</span> .env.example .env
+<span class="cm"># → add your ANTHROPIC_API_KEY</span>
+
+<span class="cm"># 5. Launch</span>
+<span class="fn">python</span> agent.py  <span class="cm"># 🚀 start talking</span>
+      </div>
+      <div class="chip-row" style="margin-top:20px;">
+        <span class="chip green">No Docker needed</span>
+        <span class="chip">Pure Python</span>
+        <span class="chip violet">One API key</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════
+       SLIDE 10 — ROI DEMO (side-by-side)
+  ══════════════════════════════════════════════ -->
+  <div class="slide slide-dark" id="s9b">
+    <div class="mesh"></div>
+    <div class="content" style="max-width:1100px;">
+      <p class="eyebrow">See it in action</p>
+      <h2>Real savings. <span class="grad-text">Real results.</span></h2>
+      <div class="divider"></div>
+
+      <!-- Side-by-side video panels -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:28px;">
+
+        <!-- LEFT — Time savings demo -->
+        <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;overflow:hidden;">
+          <div style="background:#0a0e1a;aspect-ratio:16/9;position:relative;display:flex;align-items:center;justify-content:center;border-bottom:1px solid var(--border);">
+            <!-- Placeholder video / animated mock screen -->
+            <div style="width:100%;height:100%;position:relative;overflow:hidden;">
+              <!-- Fake terminal / screen mock -->
+              <div style="position:absolute;inset:0;background:linear-gradient(135deg,#0a0e1a,#111827);padding:18px 20px;font-family:'Cascadia Code','Fira Code',monospace;font-size:0.72rem;line-height:1.7;color:#a0aec0;overflow:hidden;">
+                <div style="color:var(--accent3);margin-bottom:8px;">● AIMy — Live Session</div>
+                <div style="color:var(--muted);">──────────────────────────</div>
+                <div class="demo-line" style="color:#e2e8f0;animation:fadeIn 0.5s 0.5s both;">User: "What's our cloud spend this month?"</div>
+                <div class="demo-line" style="color:var(--accent1);animation:fadeIn 0.5s 1.2s both;">AIMy: "Your AWS bill for March is $4,820.</div>
+                <div class="demo-line" style="color:var(--accent1);animation:fadeIn 0.5s 1.6s both;">&nbsp;That's 18% below last month's $5,880."</div>
+                <div class="demo-line" style="color:#e2e8f0;animation:fadeIn 0.5s 2.4s both;">User: "What drove the savings?"</div>
+                <div class="demo-line" style="color:var(--accent1);animation:fadeIn 0.5s 3.1s both;">AIMy: "Spot instance migration saved $620.</div>
+                <div class="demo-line" style="color:var(--accent1);animation:fadeIn 0.5s 3.5s both;">&nbsp;S3 lifecycle policy saved $440."</div>
+                <div class="demo-line" style="color:var(--accent3);animation:fadeIn 0.5s 4.2s both;font-weight:700;">✓ Answered in 4 seconds</div>
+              </div>
+              <!-- Waveform overlay at bottom -->
+              <div style="position:absolute;bottom:0;left:0;right:0;height:28px;background:linear-gradient(transparent,rgba(0,0,0,0.6));display:flex;align-items:flex-end;justify-content:center;padding-bottom:4px;gap:2px;">
+                <div class="wave-bar" style="width:3px;animation-delay:0s"></div>
+                <div class="wave-bar" style="width:3px;animation-delay:0.15s"></div>
+                <div class="wave-bar" style="width:3px;animation-delay:0.3s"></div>
+                <div class="wave-bar" style="width:3px;animation-delay:0.45s"></div>
+                <div class="wave-bar" style="width:3px;animation-delay:0.6s"></div>
+                <div class="wave-bar" style="width:3px;animation-delay:0.75s"></div>
+                <div class="wave-bar" style="width:3px;animation-delay:0.9s"></div>
+              </div>
+            </div>
+          </div>
+          <div style="padding:18px 20px;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+              <span style="font-size:1.2rem;">&#9200;</span>
+              <span style="font-weight:700;color:var(--text);">Time to Insight</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <div style="text-align:center;">
+                <div style="font-size:1.7rem;font-weight:800;color:#fc8181;">42 min</div>
+                <div style="font-size:0.72rem;color:var(--muted);">Manual dashboard</div>
+              </div>
+              <div style="font-size:1.4rem;color:var(--muted);">&#8594;</div>
+              <div style="text-align:center;">
+                <div style="font-size:1.7rem;font-weight:800;color:var(--accent3);">4 sec</div>
+                <div style="font-size:0.72rem;color:var(--muted);">With AIMy</div>
+              </div>
+              <div style="background:rgba(72,187,120,0.12);border:1px solid rgba(72,187,120,0.3);border-radius:8px;padding:6px 14px;text-align:center;">
+                <div style="font-size:1.3rem;font-weight:800;color:var(--accent3);">630×</div>
+                <div style="font-size:0.68rem;color:var(--muted);">faster</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- RIGHT — Money savings demo -->
+        <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;overflow:hidden;">
+          <div style="background:#0a0e1a;aspect-ratio:16/9;position:relative;display:flex;align-items:center;justify-content:center;border-bottom:1px solid var(--border);">
+            <div style="width:100%;height:100%;position:relative;overflow:hidden;">
+              <div style="position:absolute;inset:0;background:linear-gradient(135deg,#0a0e1a,#111827);padding:18px 20px;font-family:'Cascadia Code','Fira Code',monospace;font-size:0.72rem;line-height:1.7;color:#a0aec0;overflow:hidden;">
+                <div style="color:var(--accent2);margin-bottom:8px;">● AIMy — Cost Optimization</div>
+                <div style="color:var(--muted);">──────────────────────────</div>
+                <div class="demo-line" style="color:#e2e8f0;animation:fadeIn 0.5s 0.8s both;">User: "Where can we cut costs right now?"</div>
+                <div class="demo-line" style="color:var(--accent2);animation:fadeIn 0.5s 1.5s both;">AIMy: "I found 3 quick wins:"</div>
+                <div class="demo-line" style="color:var(--accent2);animation:fadeIn 0.5s 2.0s both;">&nbsp;1. 8 idle EC2 instances → save $380/mo</div>
+                <div class="demo-line" style="color:var(--accent2);animation:fadeIn 0.5s 2.5s both;">&nbsp;2. Unused RDS snapshots → save $210/mo</div>
+                <div class="demo-line" style="color:var(--accent2);animation:fadeIn 0.5s 3.0s both;">&nbsp;3. Over-provisioned Lambda → save $155/mo</div>
+                <div class="demo-line" style="color:var(--accent4);animation:fadeIn 0.5s 3.7s both;font-weight:700;">💰 Total: $745/month saved</div>
+              </div>
+              <div style="position:absolute;bottom:0;left:0;right:0;height:28px;background:linear-gradient(transparent,rgba(0,0,0,0.6));display:flex;align-items:flex-end;justify-content:center;padding-bottom:4px;gap:2px;">
+                <div class="wave-bar" style="width:3px;animation-delay:0.2s;background:var(--accent2)"></div>
+                <div class="wave-bar" style="width:3px;animation-delay:0.35s;background:var(--accent2)"></div>
+                <div class="wave-bar" style="width:3px;animation-delay:0.5s;background:var(--accent2)"></div>
+                <div class="wave-bar" style="width:3px;animation-delay:0.65s;background:var(--accent2)"></div>
+                <div class="wave-bar" style="width:3px;animation-delay:0.8s;background:var(--accent2)"></div>
+                <div class="wave-bar" style="width:3px;animation-delay:0.95s;background:var(--accent2)"></div>
+                <div class="wave-bar" style="width:3px;animation-delay:1.1s;background:var(--accent2)"></div>
+              </div>
+            </div>
+          </div>
+          <div style="padding:18px 20px;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+              <span style="font-size:1.2rem;">&#128176;</span>
+              <span style="font-weight:700;color:var(--text);">Cost Identified</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <div style="text-align:center;">
+                <div style="font-size:1.7rem;font-weight:800;color:#fc8181;">$0</div>
+                <div style="font-size:0.72rem;color:var(--muted);">Found without AIMy</div>
+              </div>
+              <div style="font-size:1.4rem;color:var(--muted);">&#8594;</div>
+              <div style="text-align:center;">
+                <div style="font-size:1.7rem;font-weight:800;color:var(--accent3);">$745/mo</div>
+                <div style="font-size:0.72rem;color:var(--muted);">Found in one query</div>
+              </div>
+              <div style="background:rgba(246,173,85,0.12);border:1px solid rgba(246,173,85,0.3);border-radius:8px;padding:6px 14px;text-align:center;">
+                <div style="font-size:1.3rem;font-weight:800;color:var(--accent4);">$8.9k</div>
+                <div style="font-size:0.68rem;color:var(--muted);">per year</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TOTAL ROI banner -->
+      <div style="margin-top:20px;background:linear-gradient(135deg,rgba(99,179,237,0.08),rgba(159,122,234,0.08));border:1px solid rgba(99,179,237,0.25);border-radius:14px;padding:18px 28px;display:flex;align-items:center;justify-content:space-between;gap:20px;">
+        <div style="font-size:0.85rem;color:var(--muted);font-weight:500;">Combined ROI — one 30-second conversation with AIMy</div>
+        <div style="display:flex;gap:32px;align-items:center;">
+          <div style="text-align:center;">
+            <div style="font-size:1.4rem;font-weight:800;color:var(--accent3);">41m 56s</div>
+            <div style="font-size:0.72rem;color:var(--muted);">Time reclaimed</div>
+          </div>
+          <div style="width:1px;height:36px;background:var(--border);"></div>
+          <div style="text-align:center;">
+            <div style="font-size:1.4rem;font-weight:800;color:var(--accent4);">$8,940/yr</div>
+            <div style="font-size:0.72rem;color:var(--muted);">Cost savings found</div>
+          </div>
+          <div style="width:1px;height:36px;background:var(--border);"></div>
+          <div style="background:linear-gradient(135deg,var(--accent1),var(--accent2));border-radius:10px;padding:10px 20px;text-align:center;">
+            <div style="font-size:1.6rem;font-weight:900;color:#fff;">&#10024; Priceless</div>
+            <div style="font-size:0.7rem;color:rgba(255,255,255,0.7);">Total impact</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════
+       SLIDE 11 — ROADMAP (was 10)
+  ══════════════════════════════════════════════ -->
+  <div class="slide slide-dark" id="s9">
+    <div class="mesh"></div>
+    <div class="content">
+      <p class="eyebrow">Vision</p>
+      <h2>What's <span class="grad-text">next</span></h2>
+      <div class="divider"></div>
+      <div class="cards cards-2" style="margin-top:28px;">
+        <div class="card">
+          <div class="card-icon">&#128293;</div>
+          <h3>Multi-Agent Orchestration</h3>
+          <p>AIMy as a command center for spawning, directing, and terminating multiple AI agents simultaneously via voice.</p>
+        </div>
+        <div class="card">
+          <div class="card-icon">&#128202;</div>
+          <h3>Live Telemetry</h3>
+          <p>Real-time verbal status reports from running agents — AIMy narrates what your AI fleet is doing.</p>
+        </div>
+        <div class="card">
+          <div class="card-icon">&#127760;</div>
+          <h3>Remote Sessions</h3>
+          <p>Daily.co WebRTC transport unlocks multi-user, geo-distributed AI management sessions.</p>
+        </div>
+        <div class="card">
+          <div class="card-icon">&#128279;</div>
+          <h3>Tool Integrations</h3>
+          <p>Connect GitHub, Jira, Slack, Datadog — manage your entire dev stack through conversation.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════
+       SLIDE 11 — CTA / CLOSE
+  ══════════════════════════════════════════════ -->
+  <div class="slide slide-hero" id="s10">
+    <div class="mesh"></div>
+    <div class="content" style="text-align:center;max-width:800px;">
+      <p class="eyebrow">Let's Build</p>
+      <div class="wordmark"><span class="ai">AI</span><span class="my">My</span></div>
+      <p class="subtitle">The future of AI management is a conversation.</p>
+      <div class="cta-box">
+        <p style="color:#a0aec0;font-size:1.05rem;margin-bottom:4px;">Start talking to your AI stack today</p>
+        <div class="cta-cmd">python agent.py</div>
+        <div style="margin-top:24px;display:flex;align-items:center;justify-content:center;gap:10px;">
+          <span class="pulse-dot"></span>
+          <span style="font-size:0.9rem;color:var(--accent3);">Ready. Listening.</span>
+        </div>
+      </div>
+      <div class="chip-row" style="justify-content:center;margin-top:28px;">
+        <span class="chip">&#127908; Voice-Native</span>
+        <span class="chip violet">&#129302; Claude-Powered</span>
+        <span class="chip green">&#9889; Real-Time</span>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /deck -->
+
+<!-- ─── Navigation ──────────────────────────────────────── -->
+<div class="nav" id="nav">
+  <button class="nav-btn" id="prevBtn" onclick="navigate(-1)">&#8592;</button>
+  <div class="nav-dots" id="dots"></div>
+  <span class="nav-counter" id="counter"></span>
+  <button class="nav-btn" id="nextBtn" onclick="navigate(1)">&#8594;</button>
+</div>
+
+<div class="kbd-hint">← → arrow keys to navigate</div>
+
+<script>
+  const slides = Array.from(document.querySelectorAll('.slide'));
+  const total  = slides.length;
+  let   curr   = 0;
+
+  const dots    = document.getElementById('dots');
+  const counter = document.getElementById('counter');
+  const progress= document.getElementById('progress');
+  const slideNum= document.getElementById('slideNum');
+
+  // Build dots
+  slides.forEach((_,i) => {
+    const d = document.createElement('div');
+    d.className = 'nav-dot' + (i===0?' active':'');
+    d.onclick = () => goTo(i);
+    dots.appendChild(d);
+  });
+
+  function updateUI() {
+    document.querySelectorAll('.nav-dot').forEach((d,i) => {
+      d.classList.toggle('active', i===curr);
+    });
+    counter.textContent = (curr+1) + ' / ' + total;
+    slideNum.textContent = (curr+1) + ' / ' + total;
+    const pct = ((curr+1)/total)*100;
+    progress.style.width = pct + '%';
+  }
+
+  function goTo(idx) {
+    if (idx < 0 || idx >= total || idx === curr) return;
+    slides[curr].classList.remove('active');
+    slides[curr].classList.add('exit');
+    const prev = curr;
+    curr = idx;
+    slides[curr].classList.remove('exit');
+    slides[curr].classList.add('active');
+    setTimeout(() => slides[prev].classList.remove('exit'), 600);
+    updateUI();
+  }
+
+  function navigate(dir) { goTo(curr + dir); }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ')  navigate(1);
+    if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')                      navigate(-1);
+    if (e.key === 'Home') goTo(0);
+    if (e.key === 'End')  goTo(total-1);
+  });
+
+  // Touch/swipe
+  let tx = 0;
+  document.addEventListener('touchstart', e => { tx = e.touches[0].clientX; }, {passive:true});
+  document.addEventListener('touchend',   e => {
+    const dx = e.changedTouches[0].clientX - tx;
+    if (Math.abs(dx) > 50) navigate(dx < 0 ? 1 : -1);
+  }, {passive:true});
+
+  updateUI();
+</script>
+</body>
+</html>
