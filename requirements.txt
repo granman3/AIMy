@@ -1,0 +1,3 @@
+pipecat-ai[anthropic,silero,daily]
+anthropic
+python-dotenv

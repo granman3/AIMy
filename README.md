@@ -1,26 +1,44 @@
 # AIMy - AI Management System
 
-An AI agent management system built with Claude.
+A Claude-powered agent built to run inside a Pipecat workflow.
 
 ## Setup
 
-1. Clone the repo
-2. Copy `.env.example` to `.env` and add your API key
-3. Install dependencies (TBD based on language choice)
+```bash
+# 1. Create virtual environment
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+
+# 2. Install dependencies
+pip install -r requirements.txt
+
+# 3. Configure environment
+cp .env.example .env
+# Add your ANTHROPIC_API_KEY to .env
+
+# 4. Run the agent
+python agent.py
+```
 
 ## Project Structure
 
 ```
 AIMy/
-├── README.md
+├── agent.py          # Main Pipecat pipeline + Claude agent
+├── requirements.txt
 ├── .env.example
 └── .gitignore
 ```
 
+## Architecture
+
+```
+Audio Input → VAD → Claude (claude-opus-4-6) → Audio Output
+```
+
+The agent uses Pipecat's `AnthropicLLMService` to run Claude inside a
+real-time pipeline with voice activity detection (VAD).
+
 ## Team
 
 Add your names here!
-
-## Hackathon
-
-Built at [Hackathon Name]
