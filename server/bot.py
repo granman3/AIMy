@@ -66,7 +66,7 @@ MAP_REGISTRY = MapRegistry()
 # URL of the Next.js backend (single source of truth for business logic)
 NEXTJS_URL = os.getenv("NEXTJS_URL", "http://localhost:3000")
 
-SYSTEM_PROMPT = """You are AIMy, a voice help kiosk for a pet store.
+SYSTEM_PROMPT = """You are Amy, a voice help kiosk for a pet store.
 Keep every reply brief and conversational because customers are standing at the kiosk.
 You speak out loud, so respond in plain natural speech only.
 Do not use markdown, bullet points, numbered lists, emojis, symbols, or screen-oriented formatting.
