@@ -54,7 +54,7 @@ export const products: Product[] = [
   { id: 'gd-001', name: 'NaturalStone Aquarium Gravel 5lb', category: 'accessories', petType: ['fish'], price: 8.99, description: 'Natural river-stone gravel in assorted earth tones. Pre-washed and safe for all freshwater aquariums. 5lb bag covers ~5 gallons.', aisle: 5, inStock: true, brand: 'NaturalStone', tags: ['gravel', 'substrate', 'natural'], compatibilityNotes: ['Use 1lb per gallon of tank'] },
   { id: 'gd-002', name: 'NaturalStone Aquarium Gravel 10lb', category: 'accessories', petType: ['fish'], price: 14.99, description: 'Natural river-stone gravel. 10lb bag covers ~10 gallons. Pre-washed.', aisle: 5, inStock: true, brand: 'NaturalStone', tags: ['gravel', 'substrate', 'natural', 'value'] },
   { id: 'gd-003', name: 'AquaScape Silk Plants 3-Pack', category: 'accessories', petType: ['fish'], price: 11.99, description: 'Realistic silk aquarium plants. Safe for bettas (won\'t tear fins like plastic). Weighted bases stay put.', aisle: 5, inStock: true, brand: 'AquaScape', tags: ['plants', 'silk', 'decoration', 'betta-safe'], compatibilityNotes: ['Silk plants are safer for betta fins than plastic'] },
-  { id: 'gd-004', name: 'AquaScape Driftwood Centerpiece', category: 'accessories', petType: ['fish'], price: 16.99, description: 'Natural-look resin driftwood. Provides hiding spots for fish. Non-toxic and won\'t affect water chemistry.', aisle: 5, inStock: true, brand: 'AquaScape', tags: ['decoration', 'driftwood', 'hideout'] },
+  { id: 'gd-004', name: 'AquaScape Driftwood Centerpiece', category: 'accessories', petType: ['fish'], price: 16.99, description: 'Natural-look resin driftwood. Provides hiding spots for fish. Non-toxic and won\'t affect water chemistry.', aisle: 5, inStock: true, brand: 'AquaScape', tags: ['decoration', 'driftwood', 'hideout', 'betta-safe'] },
   { id: 'gd-005', name: 'GlowFish Neon Gravel 5lb', category: 'accessories', petType: ['fish'], price: 9.99, description: 'Brightly colored neon gravel. Fun for kids\' tanks. Non-toxic coating safe for all freshwater fish.', aisle: 5, inStock: true, brand: 'GlowFish', tags: ['gravel', 'neon', 'colorful', 'kids'] },
 
   // ===== TOYS (Aisle 6) =====
@@ -111,7 +111,7 @@ export function searchProducts(query: {
   if (query.petType) {
     const pt = query.petType.toLowerCase();
     results = results.filter(p =>
-      p.petType.some(t => t.toLowerCase().includes(pt))
+      p.petType.some(t => t.toLowerCase() === pt)
     );
   }
 

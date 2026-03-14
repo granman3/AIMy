@@ -1,3 +1,4 @@
 pipecat-ai[anthropic,silero,daily,whisper,edge]
 anthropic
 python-dotenv
+httpx

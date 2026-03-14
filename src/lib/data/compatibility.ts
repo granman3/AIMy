@@ -30,16 +30,14 @@ export function checkCompatibility(
   if (hasGoldfish && has10GallonOrSmaller) {
     const goldFishCount = context.match(/(\d+)\s*goldfish/)?.[1];
     const count = goldFishCount ? parseInt(goldFishCount) : 1;
-    if (count > 2 || has10GallonOrSmaller) {
-      warnings.push(
-        'Goldfish produce a lot of waste and need more space than most people think. ' +
-        'A single goldfish needs at least 20 gallons, and each additional goldfish needs 10 more gallons.'
-      );
-      if (count <= 2) {
-        suggestions.push('Consider upgrading to at least a 20-gallon tank for a healthier goldfish.');
-      } else {
-        suggestions.push(`For ${count} goldfish, I recommend at least a ${20 + (count - 1) * 10}-gallon tank.`);
-      }
+    warnings.push(
+      'Goldfish produce a lot of waste and need more space than most people think. ' +
+      'A single goldfish needs at least 20 gallons, and each additional goldfish needs 10 more gallons.'
+    );
+    if (count <= 2) {
+      suggestions.push('Consider upgrading to at least a 20-gallon tank for a healthier goldfish.');
+    } else {
+      suggestions.push(`For ${count} goldfish, I recommend at least a ${20 + (count - 1) * 10}-gallon tank.`);
     }
   }
 
@@ -62,7 +60,7 @@ export function checkCompatibility(
   const filters = selectedProducts.filter(p => p.tags.includes('filter'));
   if (tanks.length > 0 && filters.length > 0) {
     const tankIs20Plus = tanks.some(p => p.tags.includes('20-gallon') || p.tags.includes('30-gallon'));
-    const filterIs20Max = filters.some(p => p.id === 'fe-001'); // AquaClear 20
+    const filterIs20Max = filters.some(p => p.tags.includes('20-gallon') && p.tags.includes('filter'));
     if (tankIs20Plus && filterIs20Max) {
       warnings.push(
         'The AquaClear 20 filter is rated for up to 20 gallons. For a larger tank, consider the AquaClear 50.'

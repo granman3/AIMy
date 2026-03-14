@@ -1,7 +1,5 @@
 'use client';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 export function createSpeechRecognition(
   onResult: (text: string) => void,
   onEnd: () => void,
