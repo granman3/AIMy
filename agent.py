@@ -29,7 +29,7 @@ async def main():
 
     llm = AnthropicLLMService(
         api_key=os.getenv("ANTHROPIC_API_KEY"),
-        model="claude-sonnet-4-6",
+        model="claude-opus-4-6",
     )
 
     context = OpenAILLMContext(
