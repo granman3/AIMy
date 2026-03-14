@@ -138,7 +138,7 @@
     .card-icon { font-size: 1.5rem; margin-bottom: var(--space-sm); opacity: 0.9; }
     .card-img {
       width: 100%;
-      height: 100px;
+      height: 160px;
       object-fit: cover;
       border-radius: var(--radius-sm);
       margin-bottom: var(--space-sm);
@@ -494,8 +494,9 @@
         </div>
         <div>
           <div class="card" style="padding:var(--space-lg);text-align:center;">
-            <div class="card-img-wrap" style="margin:0 auto var(--space-sm);width:100%;max-width:180px;aspect-ratio:1;border-radius:var(--radius-sm);overflow:hidden;background:var(--surface-elevated);display:flex;align-items:center;justify-content:center;">
-              <img class="card-img" src="https://upload.wikimedia.org/wikipedia/commons/9/92/Easy_button.JPG" alt="Staples Easy Button — one press at the entrance" decoding="async" style="width:100%;height:100%;object-fit:contain;display:block;">
+            <div style="margin:0 auto var(--space-sm);width:120px;height:120px;border-radius:50%;background:radial-gradient(circle at 40% 35%, #ff4d4d, #cc0000 60%, #990000);box-shadow:0 6px 24px rgba(204,0,0,0.4), inset 0 -4px 8px rgba(0,0,0,0.3), inset 0 2px 4px rgba(255,255,255,0.25);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:transform 0.15s, box-shadow 0.15s;position:relative;">
+              <div style="font-family:'Space Grotesk',system-ui,sans-serif;font-size:0.85rem;font-weight:800;color:white;text-transform:uppercase;letter-spacing:0.08em;text-shadow:0 1px 3px rgba(0,0,0,0.5);line-height:1.2;text-align:center;">EASY</div>
+              <div style="position:absolute;top:8px;left:50%;transform:translateX(-50%);width:60%;height:30%;border-radius:50%;background:linear-gradient(180deg,rgba(255,255,255,0.35),transparent);pointer-events:none;"></div>
             </div>
             <h3 style="font-size:1.25rem;margin-bottom:var(--space-sm);color:var(--primary);">Easy Button</h3>
             <p>One press activates AIMy. No app download, no login, no screen — just your voice and an instant answer.</p>
@@ -538,30 +539,41 @@
       <div class="divider"></div>
       <div class="cards cards-3">
         <div class="card card--accent">
-          <img class="card-img" src="https://images.unsplash.com/photo-1753715613651-749ef230482c?w=320&h=120&fit=crop" alt="Checklist — items with quantities and aisles">
+          <img class="card-img" src="https://images.unsplash.com/photo-1504148455328-c376907d081c?w=800&h=400&fit=crop&q=80" alt="Hardware store shelves with organized tools and supplies">
           <h3 style="color:var(--primary);">Smart Shopping List</h3>
           <p>Every item with exact quantities, aisle numbers, and prices — tailored to your project dimensions.</p>
           <div style="margin-top:var(--space-sm);font-size:0.8125rem;color:var(--text-muted);font-weight:600;">Text or print at kiosk</div>
         </div>
         <div class="card card--secondary">
-          <img class="card-img" src="https://images.unsplash.com/photo-1569336415962-a4bd9f69cd83?w=320&h=120&fit=crop" alt="Store aisle — one clean sweep, no backtracking">
+          <img class="card-img" src="https://images.unsplash.com/photo-1534452203293-494d7ddbf7e0?w=800&h=400&fit=crop&q=80" alt="Long hardware store aisle with clear path for navigation">
           <h3 style="color:var(--text);">Optimized Route</h3>
           <p>One clean sweep through the store — no backtracking. Heavy items first, checkout last.</p>
           <div style="margin-top:var(--space-sm);font-size:0.8125rem;color:var(--text-muted);font-weight:600;">20 min avg vs 60 min without</div>
         </div>
         <div class="card card--success">
-          <img class="card-img" src="https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=320&h=120&fit=crop" alt="Receipt and total — know your subtotal before you shop">
+          <img class="card-img" src="https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=800&h=400&fit=crop&q=80" alt="Customer at checkout counter with shopping cart of items">
           <h3 style="color:var(--text);">Instant Subtotal</h3>
           <p>Know your budget before you grab a single item — exact quantities, no guessing, no surprise at checkout.</p>
           <div style="margin-top:var(--space-sm);font-size:0.8125rem;color:var(--text-muted);font-weight:600;">67% fewer return trips</div>
         </div>
       </div>
-      <div class="stats stats--feature">
-        <div class="stat stat--main">
+      <div style="display:flex;gap:var(--space-sm);margin-top:var(--space-md);">
+        <div class="stat" style="flex:1;">
           <div class="stat-num grad-text">3×</div>
           <div class="stat-label">more items per trip</div>
         </div>
-        <p class="stats-inline">67% fewer return trips · 20 min saved per visit · 0 apps to download</p>
+        <div class="stat" style="flex:1;">
+          <div class="stat-num" style="color:var(--success);">67%</div>
+          <div class="stat-label">fewer return trips</div>
+        </div>
+        <div class="stat" style="flex:1;">
+          <div class="stat-num" style="color:var(--primary);">20 min</div>
+          <div class="stat-label">saved per visit</div>
+        </div>
+        <div class="stat" style="flex:1;">
+          <div class="stat-num" style="color:var(--text);">0</div>
+          <div class="stat-label">apps to download</div>
+        </div>
       </div>
     </div>
   </div>
@@ -576,8 +588,9 @@
       <p class="subtitle">Press the button. Describe your project.<br>Walk out with everything you need.</p>
       <div class="cta-box">
         <p style="margin-bottom:4px;">One button at the door. No app.</p>
-        <div style="margin:0 auto var(--space-sm);max-width:180px;aspect-ratio:1;border-radius:var(--radius-sm);overflow:hidden;background:var(--surface-elevated);">
-          <img src="https://upload.wikimedia.org/wikipedia/commons/9/92/Easy_button.JPG" alt="Staples Easy Button" style="width:100%;height:100%;object-fit:contain;display:block;">
+        <div style="margin:0 auto var(--space-sm);width:120px;height:120px;border-radius:50%;background:radial-gradient(circle at 40% 35%, #ff4d4d, #cc0000 60%, #990000);box-shadow:0 6px 24px rgba(204,0,0,0.4), inset 0 -4px 8px rgba(0,0,0,0.3), inset 0 2px 4px rgba(255,255,255,0.25);display:flex;align-items:center;justify-content:center;position:relative;">
+          <div style="font-family:'Space Grotesk',system-ui,sans-serif;font-size:0.85rem;font-weight:800;color:white;text-transform:uppercase;letter-spacing:0.08em;text-shadow:0 1px 3px rgba(0,0,0,0.5);line-height:1.2;text-align:center;">EASY</div>
+          <div style="position:absolute;top:8px;left:50%;transform:translateX(-50%);width:60%;height:30%;border-radius:50%;background:linear-gradient(180deg,rgba(255,255,255,0.35),transparent);pointer-events:none;"></div>
         </div>
         <div style="font-size:1.125rem;font-weight:700;color:var(--primary);">Press the Easy Button</div>
         <div style="margin-top:var(--space-md);display:flex;align-items:center;justify-content:center;gap:var(--space-xs);">
