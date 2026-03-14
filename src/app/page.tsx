@@ -14,14 +14,22 @@ interface Message {
   toolCalls?: ToolCallInfo[];
 }
 
-const IDLE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+const IDLE_TIMEOUT_MS = 5 * 60 * 1000;
 
 function getGreeting(): string {
-  const hour = new Date().getHours();
-  if (hour < 12) return 'Good morning';
-  if (hour < 17) return 'Good afternoon';
+  const h = new Date().getHours();
+  if (h < 12) return 'Good morning';
+  if (h < 17) return 'Good afternoon';
   return 'Good evening';
 }
+
+const SUGGESTIONS = [
+  'I just got a goldfish — what do I need?',
+  'My betta fish might have fin rot',
+  'Tropical fish tank under $75',
+  'New puppy supplies',
+  'My cat needs a scratching post',
+];
 
 export default function KioskPage() {
   const [sessionId, setSessionId] = useState(() => uuidv4());
@@ -35,7 +43,6 @@ export default function KioskPage() {
   const recognitionRef = useRef<ReturnType<typeof createSpeechRecognition>>(null);
   const idleTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
 
-  // Check for speech recognition support
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const SR =
@@ -45,12 +52,10 @@ export default function KioskPage() {
     }
   }, []);
 
-  // Auto-scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading, planId]);
 
-  // Idle timer — auto-reset after 5 min of inactivity
   const resetIdleTimer = useCallback(() => {
     if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
     idleTimerRef.current = setTimeout(() => {
@@ -67,14 +72,11 @@ export default function KioskPage() {
 
   useEffect(() => {
     resetIdleTimer();
-    return () => {
-      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
-    };
+    return () => { if (idleTimerRef.current) clearTimeout(idleTimerRef.current); };
   }, [messages, resetIdleTimer]);
 
   const sendMessage = useCallback(async (text: string) => {
     if (!text.trim() || isLoading) return;
-
     stopSpeaking();
     resetIdleTimer();
 
@@ -88,36 +90,18 @@ export default function KioskPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: text, sessionId }),
       });
-
       const data = await res.json();
 
       if (data.error) {
-        setMessages(prev => [
-          ...prev,
-          { role: 'assistant', content: 'Sorry, I had trouble processing that. Could you try again?' },
-        ]);
+        setMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, I had trouble with that. Could you try again?' }]);
       } else {
-        const assistantMsg: Message = {
-          role: 'assistant',
-          content: data.message,
-          toolCalls: data.toolCalls,
-        };
+        const assistantMsg: Message = { role: 'assistant', content: data.message, toolCalls: data.toolCalls };
         setMessages(prev => [...prev, assistantMsg]);
-
-        if (data.planId) {
-          setPlanId(data.planId);
-        }
-
-        // Speak the response
-        if (voiceEnabled && data.message) {
-          speak(data.message);
-        }
+        if (data.planId) setPlanId(data.planId);
+        if (voiceEnabled && data.message) speak(data.message);
       }
     } catch {
-      setMessages(prev => [
-        ...prev,
-        { role: 'assistant', content: 'Oops, something went wrong. Please try again!' },
-      ]);
+      setMessages(prev => [...prev, { role: 'assistant', content: 'Something went wrong. Please try again.' }]);
     } finally {
       setIsLoading(false);
     }
@@ -129,16 +113,11 @@ export default function KioskPage() {
       setIsListening(false);
       return;
     }
-
     const recognition = createSpeechRecognition(
-      (text) => {
-        setIsListening(false);
-        sendMessage(text);
-      },
+      (text) => { setIsListening(false); sendMessage(text); },
       () => setIsListening(false),
       () => setIsListening(false)
     );
-
     if (recognition) {
       recognitionRef.current = recognition;
       recognition.start();
@@ -146,7 +125,6 @@ export default function KioskPage() {
     }
   }, [isListening, sendMessage]);
 
-  // Smooth reset — no page reload
   const handleReset = () => {
     stopSpeaking();
     setMessages([]);
@@ -161,33 +139,33 @@ export default function KioskPage() {
     : null;
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white flex flex-col">
+    <div className="min-h-screen flex flex-col" style={{ background: 'var(--bg)', color: 'var(--text)' }}>
+
       {/* Header */}
-      <header className="bg-gray-900/80 backdrop-blur-sm border-b border-gray-800 px-4 py-3 flex items-center justify-between sticky top-0 z-10">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-lg">
-            🐾
+      <header
+        className="px-5 py-3 flex items-center justify-between sticky top-0 z-10"
+        style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border-c)' }}
+      >
+        <div className="flex items-center gap-4">
+          <div className="wordmark text-xl">
+            AI<span className="accent">M</span><span className="accent">y</span>
           </div>
-          <div>
-            <h1 className="text-lg font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-              AIMy
-            </h1>
-            <p className="text-[11px] text-gray-500 uppercase tracking-wider">
-              Paws & Claws Pet Emporium
-            </p>
-          </div>
+          <div style={{ width: '1px', height: '20px', background: 'var(--border-focus)' }} />
+          <p className="text-xs uppercase tracking-widest" style={{ color: 'var(--text-dim)', letterSpacing: '0.1em' }}>
+            Paws &amp; Claws Pet Emporium
+          </p>
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Voice toggle */}
           <button
-            onClick={() => {
-              stopSpeaking();
-              setVoiceEnabled(!voiceEnabled);
+            onClick={() => { stopSpeaking(); setVoiceEnabled(!voiceEnabled); }}
+            className="p-2 rounded"
+            style={{
+              background: voiceEnabled ? 'var(--primary-soft)' : 'var(--surface-el)',
+              border: '1px solid var(--border-c)',
+              color: voiceEnabled ? 'var(--primary)' : 'var(--text-dim)',
+              transition: 'all 0.18s',
             }}
-            className={`p-2 rounded-lg transition-colors ${
-              voiceEnabled ? 'text-purple-400 bg-purple-500/10' : 'text-gray-500 bg-gray-800'
-            }`}
             title={voiceEnabled ? 'Mute voice' : 'Enable voice'}
           >
             {voiceEnabled ? (
@@ -197,10 +175,10 @@ export default function KioskPage() {
             )}
           </button>
 
-          {/* Reset button — larger, more visible */}
           <button
             onClick={handleReset}
-            className="text-sm px-4 py-2 rounded-lg bg-gray-800 text-gray-300 active:bg-gray-600 border border-gray-700 transition-colors"
+            className="text-sm px-4 py-1.5 rounded"
+            style={{ background: 'var(--surface-el)', border: '1px solid var(--border-c)', color: 'var(--text-muted)' }}
           >
             New Chat
           </button>
@@ -208,72 +186,60 @@ export default function KioskPage() {
       </header>
 
       {/* Chat area */}
-      <main className="flex-1 overflow-y-auto px-4 py-6 max-w-2xl w-full mx-auto" aria-live="polite">
-        {/* Welcome message */}
+      <main className="flex-1 overflow-y-auto px-4 py-8 max-w-2xl w-full mx-auto" aria-live="polite">
+
         {messages.length === 0 && (
-          <div className="text-center py-12">
-            <div className="text-6xl mb-4">🐾</div>
-            <h2 className="text-3xl font-bold mb-2">
-              {getGreeting()}! I&apos;m{' '}
-              <span className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-                AIMy
-              </span>
-            </h2>
-            <p className="text-lg text-gray-400 mb-6 max-w-md mx-auto">
-              Your AI shopping assistant. Tell me what you need and I&apos;ll build a personalized plan!
+          <div className="py-16 text-center">
+            <div className="wordmark mb-3" style={{ fontSize: 'clamp(3rem, 10vw, 5rem)' }}>
+              AI<span className="accent">M</span><span className="accent">y</span>
+            </div>
+            <div className="divider mx-auto mb-5" />
+            <p className="text-lg mb-1" style={{ color: 'var(--text)' }}>{getGreeting()}.</p>
+            <p className="mb-8 max-w-sm mx-auto" style={{ color: 'var(--text-muted)', lineHeight: '1.6' }}>
+              Tell me about your pet and I&apos;ll build a shopping plan — items, aisles, and your total.
             </p>
 
-            {/* Mic prompt — prominent */}
             {hasMic && (
-              <div className="flex items-center justify-center gap-3 mb-8 text-purple-300">
-                <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center">
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+              <div className="flex items-center justify-center gap-2 mb-8" style={{ color: 'var(--text-muted)' }}>
+                <div
+                  className="w-8 h-8 rounded flex items-center justify-center shrink-0"
+                  style={{ background: 'var(--primary-soft)', border: '1px solid var(--border-c)' }}
+                >
+                  <svg className="w-4 h-4" fill="currentColor" style={{ color: 'var(--primary)' }} viewBox="0 0 24 24">
                     <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
                     <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
                   </svg>
                 </div>
-                <span className="text-base font-medium">Tap the mic and tell me what you need</span>
+                <span className="text-sm">Tap the mic and describe what you need</span>
               </div>
             )}
 
-            {/* Quick suggestions */}
-            <p className="text-sm text-gray-500 mb-3">Or try one of these:</p>
             <div className="flex flex-wrap gap-2 justify-center max-w-xl mx-auto">
-              {[
-                'I just got a goldfish - what do I need?',
-                'My betta fish might have fin rot',
-                'Tropical fish tank under $75',
-                'I need supplies for a new puppy',
-                'My cat needs a scratching post',
-              ].map((suggestion) => (
-                <button
-                  key={suggestion}
-                  onClick={() => sendMessage(suggestion)}
-                  className="text-base px-5 py-3 rounded-full bg-gray-800 text-gray-300 active:bg-purple-500/30 active:text-purple-200 border border-gray-700 active:border-purple-500/30 transition-all"
-                >
-                  {suggestion}
+              {SUGGESTIONS.map(s => (
+                <button key={s} onClick={() => sendMessage(s)} className="suggestion-chip">
+                  {s}
                 </button>
               ))}
             </div>
           </div>
         )}
 
-        {/* Messages */}
         {messages.map((msg, i) => (
           <ChatMessage key={i} role={msg.role} content={msg.content} toolCalls={msg.toolCalls} />
         ))}
 
-        {/* Loading indicator */}
         {isLoading && <ChatMessage role="assistant" content="" isLoading />}
 
-        {/* QR Code */}
         {planUrl && <div className="mt-6"><QRCodeDisplay planUrl={planUrl} /></div>}
 
         <div ref={messagesEndRef} />
       </main>
 
       {/* Input area */}
-      <footer className="bg-gray-900/80 backdrop-blur-sm border-t border-gray-800 px-4 py-3 max-w-2xl w-full mx-auto">
+      <footer
+        className="px-4 py-3 max-w-2xl w-full mx-auto"
+        style={{ background: 'var(--surface)', borderTop: '1px solid var(--border-c)' }}
+      >
         <ChatInput
           onSend={sendMessage}
           disabled={isLoading}
