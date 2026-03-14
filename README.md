@@ -55,3 +55,30 @@ AIMy/
 ## Team
 
 Add your names here!
+
+## Imported Pipecat Demo
+
+This repository now also contains the Pipecat ESP32 SmallWebRTC demo that was previously developed in this folder.
+
+### Added directories
+
+- `server/` - Python bot server for the SmallWebRTC pipeline
+- `pipecat-esp32/` - ESP32-side project assets and configuration
+
+### Demo configuration
+
+- Bot Type: Web
+- Transport: SmallWebRTC
+- Pipeline: Cascade
+- STT: Deepgram Flux
+- LLM: Anthropic Claude
+- TTS: Deepgram
+
+### Demo setup
+
+```bash
+cd server
+uv sync
+cp .env.example .env
+uv run bot.py
+```
